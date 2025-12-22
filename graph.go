@@ -8,6 +8,7 @@ import (
 type Graph[T any] struct {
 	edges          []Edge[T]
 	nodeComparator func(n1 Node[T], n2 Node[T]) int
+	nodeEqual      func(n1 Node[T], n2 Node[T]) bool
 }
 
 // Represents an edge in Graph
@@ -31,7 +32,11 @@ func Create[T any]() Graph[T] {
 }
 
 func (g Graph[T]) AddNodeComparator(comparator func(n1 Node[T], n2 Node[T]) int) Graph[T] {
-	return Graph[T]{edges: g.edges, nodeComparator: comparator}
+	return Graph[T]{edges: g.edges, nodeComparator: comparator, nodeEqual: g.nodeEqual}
+}
+
+func (g Graph[T]) AddNodeEqualFn(eqFn func(n1 Node[T], n2 Node[T]) bool) Graph[T] {
+	return Graph[T]{edges: g.edges, nodeComparator: g.nodeComparator, nodeEqual: eqFn}
 }
 
 // Computes a new graph after adding that edge to this graph. Leaves the original graph unmodified.
@@ -54,6 +59,10 @@ func CreateNode[T any](val T) Node[T] {
 	return Node[T]{
 		val: val,
 	}
+}
+
+func (n Node[T]) GetVal() T {
+	return n.val
 }
 
 /*
@@ -85,11 +94,11 @@ func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 	for _, e := range g.edges {
 		// If e is directed we only check if the edge leads to the source
 		if e.directed {
-			if &source == &e.v {
+			if g.nodeEqual(source, e.v) {
 				returnEdges = append(returnEdges, e)
 			}
 		} else {
-			if &source == &e.v || &source == &e.u {
+			if g.nodeEqual(source, e.v) || g.nodeEqual(source, e.u) {
 				returnEdges = append(returnEdges, e)
 			}
 		}
@@ -103,11 +112,11 @@ func (g Graph[T]) FindEdgesThatLeadFrom(source Node[T]) []Edge[T] {
 	for _, e := range g.edges {
 		// If e is directed we only check if the edge leads to the source
 		if e.directed {
-			if &source == &e.u {
+			if g.nodeEqual(source, e.u) {
 				returnEdges = append(returnEdges, e)
 			}
 		} else {
-			if &source == &e.v || &source == &e.u {
+			if g.nodeEqual(source, e.v) || g.nodeEqual(source, e.u) {
 				returnEdges = append(returnEdges, e)
 			}
 		}
@@ -126,7 +135,7 @@ func (g Graph[T]) IsDirectedGraph() bool {
 		allMap = append(allMap, e.directed)
 		if firstVal == nil {
 			firstVal = &e.directed
-		} else if firstVal != &e.directed {
+		} else if *firstVal != e.directed {
 			panic("Inconsistant Checks")
 		}
 	}
@@ -163,21 +172,23 @@ func (g Graph[T]) FindNeighboringNodes(source Node[T]) []Node[T] {
 // Performs a DFS on this graph from the given source, returns a list of nodes that were visited by DFS in order if this
 // graph has a comparator.
 func (g Graph[T]) DFS(source Node[T]) []Node[T] {
-	var dfsImpl func(src Node[T], visited []*Node[T], acc []Node[T]) []Node[T]
-	dfsImpl = func(src Node[T], visited []*Node[T], acc []Node[T]) []Node[T] {
+	var dfsImpl func(src Node[T], visited *[]*Node[T], acc *[]Node[T])
+	dfsImpl = func(src Node[T], visited *[]*Node[T], acc *[]Node[T]) {
 		// Mark the current node as visited
+		*visited = append(*visited, &src)
 		neighbors := g.FindNeighboringNodes(src)
 		if g.nodeComparator != nil {
 			slices.SortStableFunc(neighbors, g.nodeComparator)
 		}
 		for _, neighbor := range neighbors {
-			if !slices.Contains(visited, &neighbor) {
-				newAcc := append(acc, neighbor)
-				newVisited := append(visited, &neighbor)
-				return dfsImpl(neighbor, newVisited, newAcc)
+			if !slices.Contains(*visited, &neighbor) {
+				*acc = append(*acc, neighbor)
+				dfsImpl(neighbor, visited, acc)
 			}
 		}
-		return acc
 	}
-	return dfsImpl(source, []*Node[T]{&source}, []Node[T]{})
+	acc := []Node[T]{}
+	visited := []*Node[T]{}
+	dfsImpl(source, &visited, &acc)
+	return acc
 }
