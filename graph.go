@@ -163,12 +163,21 @@ func (g Graph[T]) FindNeighboringNodes(source Node[T]) []Node[T] {
 // Performs a DFS on this graph from the given source, returns a list of nodes that were visited by DFS in order if this
 // graph has a comparator.
 func (g Graph[T]) DFS(source Node[T]) []Node[T] {
-	var dfsImpl func(src Node[T], visited []Node[T], acc []Node[T]) []Node[T]
-	dfsImpl = func(src Node[T], visited []Node[T], acc []Node[T]) []Node[T] {
+	var dfsImpl func(src Node[T], visited []*Node[T], acc []Node[T]) []Node[T]
+	dfsImpl = func(src Node[T], visited []*Node[T], acc []Node[T]) []Node[T] {
 		// Mark the current node as visited
-		newVisited := append(visited, src)
 		neighbors := g.FindNeighboringNodes(src)
+		if g.nodeComparator != nil {
+			slices.SortStableFunc(neighbors, g.nodeComparator)
+		}
+		for _, neighbor := range neighbors {
+			if !slices.Contains(visited, &neighbor) {
+				newAcc := append(acc, neighbor)
+				newVisited := append(visited, &neighbor)
+				return dfsImpl(neighbor, newVisited, newAcc)
+			}
+		}
 		return acc
 	}
-	return dfsImpl(source, []Node[T]{}, []Node[T]{})
+	return dfsImpl(source, []*Node[T]{&source}, []Node[T]{})
 }

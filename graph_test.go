@@ -22,7 +22,3 @@ func TestAddEdge(t *testing.T) {
 	g = g.AddEdge(graph.CreateEdge(n2, n3))
 	assert.Equal(t, 2, g.GetNumberOfEdges())
 }
-
-func FindEdgesThatLeadFrom(t *testing.T) {
-
-}
