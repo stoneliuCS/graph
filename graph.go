@@ -92,15 +92,8 @@ func (g Graph[T]) GetNumberOfEdges() int {
 func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 	returnEdges := []Edge[T]{}
 	for _, e := range g.edges {
-		// If e is directed we only check if the edge leads to the source
-		if e.directed {
-			if g.nodeEqual(source, e.v) {
-				returnEdges = append(returnEdges, e)
-			}
-		} else {
-			if g.nodeEqual(source, e.v) || g.nodeEqual(source, e.u) {
-				returnEdges = append(returnEdges, e)
-			}
+		if (e.directed && g.nodeEqual(source, e.v)) || (!e.directed && (g.nodeEqual(source, e.v) || g.nodeEqual(source, e.u))) {
+			returnEdges = append(returnEdges, e)
 		}
 	}
 	return returnEdges
@@ -110,15 +103,8 @@ func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 func (g Graph[T]) FindEdgesThatLeadFrom(source Node[T]) []Edge[T] {
 	returnEdges := []Edge[T]{}
 	for _, e := range g.edges {
-		// If e is directed we only check if the edge leads to the source
-		if e.directed {
-			if g.nodeEqual(source, e.u) {
-				returnEdges = append(returnEdges, e)
-			}
-		} else {
-			if g.nodeEqual(source, e.v) || g.nodeEqual(source, e.u) {
-				returnEdges = append(returnEdges, e)
-			}
+		if (e.directed && g.nodeEqual(source, e.u)) || (!e.directed && (g.nodeEqual(source, e.v) || g.nodeEqual(source, e.u))) {
+			returnEdges = append(returnEdges, e)
 		}
 	}
 	return returnEdges
@@ -172,23 +158,23 @@ func (g Graph[T]) FindNeighboringNodes(source Node[T]) []Node[T] {
 // Performs a DFS on this graph from the given source, returns a list of nodes that were visited by DFS in order if this
 // graph has a comparator.
 func (g Graph[T]) DFS(source Node[T]) []Node[T] {
-	var dfsImpl func(src Node[T], visited *[]*Node[T], acc *[]Node[T])
-	dfsImpl = func(src Node[T], visited *[]*Node[T], acc *[]Node[T]) {
+	var dfsImpl func(src Node[T], visited *[]Node[T], acc *[]Node[T])
+	dfsImpl = func(src Node[T], visited *[]Node[T], acc *[]Node[T]) {
 		// Mark the current node as visited
-		*visited = append(*visited, &src)
+		*visited = append(*visited, src)
 		neighbors := g.FindNeighboringNodes(src)
 		if g.nodeComparator != nil {
 			slices.SortStableFunc(neighbors, g.nodeComparator)
 		}
 		for _, neighbor := range neighbors {
-			if !slices.Contains(*visited, &neighbor) {
+			if !slices.ContainsFunc(*visited, func(n Node[T]) bool { return g.nodeEqual(neighbor, n) }) {
 				*acc = append(*acc, neighbor)
 				dfsImpl(neighbor, visited, acc)
 			}
 		}
 	}
-	acc := []Node[T]{}
-	visited := []*Node[T]{}
+	acc := []Node[T]{source}
+	visited := []Node[T]{}
 	dfsImpl(source, &visited, &acc)
 	return acc
 }
