@@ -7,13 +7,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var comparator = func(n1, n2 graph.Node[int]) int {
+	return n1.GetVal() - n2.GetVal()
+}
+var nodeEq = func(n1, n2 graph.Node[int]) bool {
+	return n1.GetVal() == n2.GetVal()
+}
+
 func TestCreateGraph(t *testing.T) {
-	g := graph.Create[int]()
+	g := graph.CreateWithEqAndCompFunc(comparator, nodeEq)
 	assert.NotNil(t, g)
 }
 
 func TestAddEdge(t *testing.T) {
-	g := graph.Create[int]()
+	g := graph.CreateWithEqAndCompFunc(comparator, nodeEq)
 	n1 := graph.CreateNode(1)
 	n2 := graph.CreateNode(2)
 	n3 := graph.CreateNode(3)
@@ -25,7 +32,7 @@ func TestAddEdge(t *testing.T) {
 
 func TestDFS(t *testing.T) {
 	// Test case for geeks for geeks
-	g := graph.Create[int]()
+	g := graph.CreateWithEqAndCompFunc(comparator, nodeEq)
 	n0 := graph.CreateNode(0)
 	n1 := graph.CreateNode(1)
 	n2 := graph.CreateNode(2)
@@ -36,12 +43,6 @@ func TestDFS(t *testing.T) {
 	g = g.AddEdge(graph.CreateEdge(n1, n2))
 	g = g.AddEdge(graph.CreateEdge(n2, n3))
 	g = g.AddEdge(graph.CreateEdge(n2, n4))
-	g = g.AddNodeComparator(func(n1, n2 graph.Node[int]) int {
-		return n1.GetVal() - n2.GetVal()
-	})
-	g = g.AddNodeEqualFn(func(n1, n2 graph.Node[int]) bool {
-		return n1.GetVal() == n2.GetVal()
-	})
 	dfsTraversal := g.DFS(n0)
 	assert.NotEmpty(t, dfsTraversal)
 	assert.Equal(t, 5, len(dfsTraversal))

@@ -25,6 +25,17 @@ type Node[T any] struct {
 }
 
 // Creates a generic empty graph
+func CreateWithEqAndCompFunc[T any](
+	comparator func(n1 Node[T], n2 Node[T]) int,
+	eqFn func(n1 Node[T], n2 Node[T]) bool,
+) Graph[T] {
+	return Graph[T]{
+		edges:          []Edge[T]{},
+		nodeComparator: comparator,
+		nodeEqual:      eqFn,
+	}
+}
+
 func Create[T any]() Graph[T] {
 	return Graph[T]{
 		edges: []Edge[T]{},
@@ -43,7 +54,9 @@ func (g Graph[T]) AddNodeEqualFn(eqFn func(n1 Node[T], n2 Node[T]) bool) Graph[T
 func (g Graph[T]) AddEdge(edge Edge[T]) Graph[T] {
 	newEdges := append(slices.Clone(g.edges), edge)
 	return Graph[T]{
-		edges: newEdges,
+		edges:          newEdges,
+		nodeComparator: g.nodeComparator,
+		nodeEqual:      g.nodeEqual,
 	}
 }
 
