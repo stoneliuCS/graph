@@ -24,7 +24,7 @@ type Node[T any] struct {
 	val T
 }
 
-// Creates a generic empty graph
+// Creates a generic empty graph with the given comparator and equivalence functions
 func CreateWithEqAndCompFunc[T any](
 	comparator func(n1 Node[T], n2 Node[T]) int,
 	eqFn func(n1 Node[T], n2 Node[T]) bool,
@@ -101,12 +101,24 @@ func (g Graph[T]) GetNumberOfEdges() int {
 	return len(g.edges)
 }
 
+func (e Edge[T]) reverse() Edge[T] {
+	return Edge[T]{
+		u:        e.v,
+		v:        e.u,
+		directed: e.directed,
+		weight:   e.weight,
+	}
+}
+
 // Finds the edges that lead to the given node. Checks using pointer equality.
 func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 	returnEdges := []Edge[T]{}
 	for _, e := range g.edges {
-		if (e.directed && g.nodeEqual(source, e.v)) || (!e.directed && (g.nodeEqual(source, e.v) || g.nodeEqual(source, e.u))) {
+		if e.directed && g.nodeEqual(source, e.v) || (!e.directed && (g.nodeEqual(source, e.v))) {
 			returnEdges = append(returnEdges, e)
+		} else if !e.directed && g.nodeEqual(source, e.u) {
+			// We are going to reverse the direction of the edge
+			returnEdges = append(returnEdges, e.reverse())
 		}
 	}
 	return returnEdges
@@ -116,8 +128,10 @@ func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 func (g Graph[T]) FindEdgesThatLeadFrom(source Node[T]) []Edge[T] {
 	returnEdges := []Edge[T]{}
 	for _, e := range g.edges {
-		if (e.directed && g.nodeEqual(source, e.u)) || (!e.directed && (g.nodeEqual(source, e.v) || g.nodeEqual(source, e.u))) {
+		if (e.directed && g.nodeEqual(source, e.u)) || (!e.directed && g.nodeEqual(source, e.u)) {
 			returnEdges = append(returnEdges, e)
+		} else if !e.directed && (g.nodeEqual(source, e.v)) {
+			returnEdges = append(returnEdges, e.reverse())
 		}
 	}
 	return returnEdges
