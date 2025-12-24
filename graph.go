@@ -104,7 +104,7 @@ func (e Edge[T]) reverse() Edge[T] {
 	}
 }
 
-// Finds the edges that lead to the given node. Checks using pointer equality.
+// Finds the edges that lead to the given node. Checks using the given equality function on the graph
 func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 	returnEdges := []Edge[T]{}
 	for _, e := range g.edges {
@@ -118,7 +118,7 @@ func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 	return returnEdges
 }
 
-// Finds all edges that lead from the given node. Checks using pointer equality.
+// Finds the edges that lead from the given node. Checks using the given equality function on the graph
 func (g Graph[T]) FindEdgesThatLeadFrom(source Node[T]) []Edge[T] {
 	returnEdges := []Edge[T]{}
 	for _, e := range g.edges {
@@ -268,4 +268,13 @@ func MapGraph[T any, U any](
 		nodeComparator: comparator,
 		nodeEqual:      eqFn,
 	}
+}
+
+// Finds the "in-degree" or the number of edges that lead to this source node.
+func (g Graph[T]) FindIndegree(source Node[T]) int {
+	return len(g.FindEdgesThatLeadTo(source))
+}
+
+func (g Graph[T]) FindOutDegree(source Node[T]) int {
+	return len(g.FindEdgesThatLeadFrom(source))
 }

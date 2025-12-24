@@ -19,3 +19,8 @@ these include
 - `DFS` _Depth First Search_, enables traversing the graph in a DFS manner
 - `BFS` _Breadth First Search_, enables traversing the graph in a BFS manner
 - `Map` _Map_, enables mapping/translating a graph of type `X` to a graph of type `Y`
+
+## API Design
+Every single method and function available in `graph` is pure and functional. Meaning that the resulting method
+application does not change the underlying graph, instead it returns a new graph underneath. HOWEVER, this does not
+gurantee that mutable data types will not be cloned.
