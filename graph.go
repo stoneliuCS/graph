@@ -73,7 +73,7 @@ func (n Node[T]) GetVal() T {
 }
 
 /*
-Creates a new graph that interprets all edges as directed.
+Creates a new graph that interprets all edges as directed. I.e. makes all edges e <-> v to u -> v
 */
 func (g Graph[T]) ToDirected() Graph[T] {
 	newEdges := []Edge[T]{}
@@ -223,4 +223,49 @@ func (g Graph[T]) BFS(source Node[T]) []Node[T] {
 		}
 	}
 	return bfs
+}
+
+// Gets all the nodes in this graph. The nodes are returned as specified in the given node comparator.
+func (g Graph[T]) GetNodes() []Node[T] {
+	nodes := []Node[T]{}
+	for _, edge := range g.edges {
+		n1 := edge.u
+		n2 := edge.v
+		if !slices.ContainsFunc(nodes, func(n Node[T]) bool { return g.nodeEqual(n1, n) }) {
+			nodes = append(nodes, n1)
+		}
+		if !slices.ContainsFunc(nodes, func(n Node[T]) bool { return g.nodeEqual(n2, n) }) {
+			nodes = append(nodes, n2)
+		}
+	}
+	slices.SortStableFunc(nodes, g.nodeComparator)
+	return nodes
+}
+
+// Returns a new graph with all nodes of type U instead of type T. To make the resulting graph valid, one must also pass
+// in the corresponding comparator and equivalence functions on that type U
+// Maintains the order of the edges from the previous graph.
+func MapGraph[T any, U any](
+	graph Graph[T],
+	mapFn func(Node[T]) Node[U],
+	comparator func(n1 Node[U], n2 Node[U]) int,
+	eqFn func(n1 Node[U], n2 Node[U]) bool,
+) Graph[U] {
+	newEdges := []Edge[U]{}
+	for _, edge := range graph.edges {
+		newU := mapFn(edge.u)
+		newV := mapFn(edge.v)
+		newEdge := Edge[U]{
+			u:        newU,
+			v:        newV,
+			directed: edge.directed,
+			weight:   edge.weight,
+		}
+		newEdges = append(newEdges, newEdge)
+	}
+	return Graph[U]{
+		edges:          newEdges,
+		nodeComparator: comparator,
+		nodeEqual:      eqFn,
+	}
 }
