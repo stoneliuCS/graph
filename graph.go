@@ -36,12 +36,6 @@ func CreateWithEqAndCompFunc[T any](
 	}
 }
 
-func Create[T any]() Graph[T] {
-	return Graph[T]{
-		edges: []Edge[T]{},
-	}
-}
-
 func (g Graph[T]) AddNodeComparator(comparator func(n1 Node[T], n2 Node[T]) int) Graph[T] {
 	return Graph[T]{edges: g.edges, nodeComparator: comparator, nodeEqual: g.nodeEqual}
 }
@@ -182,17 +176,15 @@ func (g Graph[T]) FindNeighboringNodes(source Node[T]) []Node[T] {
 	return newNeighbors
 }
 
-// Performs a DFS on this graph from the given source, returns a list of nodes that were visited by DFS in order if this
-// graph has a comparator.
+// Performs a DFS on this graph from the given source, returns a list of nodes that were visited by DFS in accordance to
+// the graph comparator
 func (g Graph[T]) DFS(source Node[T]) []Node[T] {
 	var dfsImpl func(src Node[T], visited *[]Node[T], acc *[]Node[T])
 	dfsImpl = func(src Node[T], visited *[]Node[T], acc *[]Node[T]) {
 		// Mark the current node as visited
 		*visited = append(*visited, src)
 		neighbors := g.FindNeighboringNodes(src)
-		if g.nodeComparator != nil {
-			slices.SortStableFunc(neighbors, g.nodeComparator)
-		}
+		slices.SortStableFunc(neighbors, g.nodeComparator)
 		for _, neighbor := range neighbors {
 			if !slices.ContainsFunc(*visited, func(n Node[T]) bool { return g.nodeEqual(neighbor, n) }) {
 				*acc = append(*acc, neighbor)
@@ -204,4 +196,31 @@ func (g Graph[T]) DFS(source Node[T]) []Node[T] {
 	visited := []Node[T]{}
 	dfsImpl(source, &visited, &acc)
 	return acc
+}
+
+// Performs a BFS on this graph from the given source. Returns a list of nodes that were visited by DFS in accordance to
+// the graph comparator
+func (g Graph[T]) BFS(source Node[T]) []Node[T] {
+	queue := []Node[T]{}
+	visited := []Node[T]{}
+	bfs := []Node[T]{source}
+	queue = append(queue, source)
+	// While the queue is not empty
+	for len(queue) != 0 {
+		// Pop the last neighbor in the queue
+		src := queue[len(queue)-1]
+		queue = queue[:len(queue)-1]
+		visited = append(visited, src)
+		neighbors := g.FindNeighboringNodes(src)
+		slices.SortStableFunc(neighbors, g.nodeComparator)
+		for _, neighbor := range neighbors {
+			// If we haven't visited this neighbor
+			if !slices.ContainsFunc(visited, func(n Node[T]) bool { return g.nodeEqual(neighbor, n) }) {
+				bfs = append(bfs, neighbor)
+				visited = append(visited, neighbor)
+				queue = append(queue, neighbor)
+			}
+		}
+	}
+	return bfs
 }

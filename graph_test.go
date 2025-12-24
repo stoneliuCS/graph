@@ -84,3 +84,36 @@ func TestFindNeighboringNodes(t *testing.T) {
 	neighbors = g.FindNeighboringNodes(n2)
 	assert.Equal(t, []graph.Node[int]{n0, n1}, neighbors)
 }
+
+func TestBFSGraph1(t *testing.T) {
+	g := graph.CreateWithEqAndCompFunc(comparator, nodeEq)
+	n0 := graph.CreateNode(0)
+	n1 := graph.CreateNode(1)
+	n2 := graph.CreateNode(2)
+	n3 := graph.CreateNode(3)
+	n4 := graph.CreateNode(4)
+	g = g.AddEdge(graph.CreateEdge(n0, n1))
+	g = g.AddEdge(graph.CreateEdge(n0, n2))
+	g = g.AddEdge(graph.CreateEdge(n1, n2))
+	g = g.AddEdge(graph.CreateEdge(n2, n3))
+	g = g.AddEdge(graph.CreateEdge(n2, n4))
+	bfsTraversal := g.BFS(n0)
+	assert.NotEmpty(t, bfsTraversal)
+	assert.Equal(t, 5, len(bfsTraversal))
+	assert.Equal(t, []graph.Node[int]{n0, n1, n2, n3, n4}, bfsTraversal)
+}
+
+func TestBFSGraph2(t *testing.T) {
+	g := graph.CreateWithEqAndCompFunc(comparator, nodeEq)
+	n0 := graph.CreateNode(0)
+	n1 := graph.CreateNode(1)
+	n2 := graph.CreateNode(2)
+	n3 := graph.CreateNode(3)
+	g = g.AddEdge(graph.CreateEdge(n0, n2))
+	g = g.AddEdge(graph.CreateEdge(n2, n1))
+	g = g.AddEdge(graph.CreateEdge(n0, n3))
+	bfsTraversal := g.BFS(n0)
+	assert.NotEmpty(t, bfsTraversal)
+	assert.Equal(t, 4, len(bfsTraversal))
+	assert.Equal(t, []graph.Node[int]{n0, n2, n3, n1}, bfsTraversal)
+}
