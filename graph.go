@@ -99,7 +99,9 @@ func (g Graph[T]) ToDirected() Graph[T] {
 		newEdges = append(newEdges, e.ToDirected())
 	}
 	return Graph[T]{
-		edges: newEdges,
+		edges:          newEdges,
+		nodeComparator: g.nodeComparator,
+		nodeEqual:      g.nodeEqual,
 	}
 }
 
@@ -290,4 +292,35 @@ func (g Graph[T]) FindIndegree(source Node[T]) int {
 
 func (g Graph[T]) FindOutDegree(source Node[T]) int {
 	return len(g.FindEdgesThatLeadFrom(source))
+}
+
+// Determines if this graph contains a cycle.
+func (g Graph[T]) ContainsCycle() bool {
+	var isCyclicImpl func(idx int, node Node[T], visited, stack []bool) bool
+	isCyclicImpl = func(idx int, node Node[T], visited, stack []bool) bool {
+		if stack[idx] {
+			return true
+		}
+		if visited[idx] {
+			return false
+		}
+		stack[idx] = true
+		visited[idx] = true
+		for newIdx, neighbor := range g.FindNeighboringNodes(node) {
+			if isCyclicImpl(newIdx, neighbor, visited, stack) {
+				return true
+			}
+		}
+		stack[idx] = true
+		return false
+	}
+	nodes := g.GetNodes()
+	visited := make([]bool, len(nodes))
+	stack := make([]bool, len(nodes))
+	for idx, node := range nodes {
+		if !visited[idx] && isCyclicImpl(idx, node, visited, stack) {
+			return true
+		}
+	}
+	return false
 }

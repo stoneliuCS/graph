@@ -56,6 +56,19 @@ func createGraph2() graph.Graph[int] {
 	return g
 }
 
+func createDirectedCyclicGraph() graph.Graph[int] {
+	g := graph.CreateWithEqAndCompFunc(comparator, nodeEq)
+	n0 := graph.CreateNode(0)
+	n1 := graph.CreateNode(1)
+	n2 := graph.CreateNode(2)
+	n3 := graph.CreateNode(3)
+	g = g.AddEdge(graph.CreateEdge(n0, n1))
+	g = g.AddEdge(graph.CreateEdge(n1, n2))
+	g = g.AddEdge(graph.CreateEdge(n2, n0))
+	g = g.AddEdge(graph.CreateEdge(n2, n3))
+	return g.ToDirected()
+}
+
 func TestCreateGraph(t *testing.T) {
 	g := graph.CreateWithEqAndCompFunc(comparator, nodeEq)
 	assert.NotNil(t, g)
@@ -165,4 +178,20 @@ func TestMapGraph1(t *testing.T) {
 	assert.Equal(t, "2", n2.GetVal())
 	assert.Equal(t, "3", n3.GetVal())
 	assert.Equal(t, "4", n4.GetVal())
+}
+
+func TestCyclicGraph1(t *testing.T) {
+	g := createDirectedCyclicGraph()
+	assert.Equal(t, []graph.Node[int]{g.GetNodes()[0], g.GetNodes()[1], g.GetNodes()[2], g.GetNodes()[3]}, g.GetNodes())
+	// The indegrees on each node
+	assert.Equal(t, 1, g.FindIndegree(g.GetNodes()[0]))
+	assert.Equal(t, 1, g.FindIndegree(g.GetNodes()[1]))
+	assert.Equal(t, 1, g.FindIndegree(g.GetNodes()[2]))
+	assert.Equal(t, 1, g.FindIndegree(g.GetNodes()[3]))
+	// The outdegrees on each ndoe
+	assert.Equal(t, 1, g.FindOutDegree(g.GetNodes()[0]))
+	assert.Equal(t, 1, g.FindOutDegree(g.GetNodes()[1]))
+	assert.Equal(t, 2, g.FindOutDegree(g.GetNodes()[2]))
+	assert.Equal(t, 0, g.FindOutDegree(g.GetNodes()[3]))
+	assert.True(t, g.ContainsCycle())
 }
