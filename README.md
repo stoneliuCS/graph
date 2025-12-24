@@ -6,9 +6,16 @@ its core design philosophy to be functional.
 .
 ├── go.mod
 ├── go.sum
-├── graph_test.go
-├── graph.go
+├── graph_test.go # graph tests
+├── graph.go # Main graph module
 └── README.md
 
 1 directory, 5 files
 ```
+
+## Main Functionalities
+The goal of this library is to create a generic graph API with a bunch of useful (and commonly) needed functionalities
+these include
+- `DFS` _Depth First Search_, enables traversing the graph in a DFS manner
+- `BFS` _Breadth First Search_, enables traversing the graph in a BFS manner
+- `Map` _Map_, enables mapping/translating a graph of type `X` to a graph of type `Y`
