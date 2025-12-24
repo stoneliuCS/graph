@@ -16,7 +16,7 @@ type Edge[T any] struct {
 	u        Node[T]
 	v        Node[T]
 	directed bool
-	weight   *float64
+	weight   float64
 }
 
 // Represents a node in Graph
@@ -62,6 +62,24 @@ func CreateEdge[T any](u Node[T], v Node[T]) Edge[T] {
 	}
 }
 
+func (e Edge[T]) ToDirected() Edge[T] {
+	return Edge[T]{
+		u:        e.u,
+		v:        e.v,
+		directed: true,
+		weight:   e.weight,
+	}
+}
+
+func (e Edge[T]) AddWeight(w float64) Edge[T] {
+	return Edge[T]{
+		u:        e.u,
+		v:        e.v,
+		directed: e.directed,
+		weight:   w,
+	}
+}
+
 func CreateNode[T any](val T) Node[T] {
 	return Node[T]{
 		val: val,
@@ -78,13 +96,7 @@ Creates a new graph that interprets all edges as directed. I.e. makes all edges 
 func (g Graph[T]) ToDirected() Graph[T] {
 	newEdges := []Edge[T]{}
 	for _, e := range g.edges {
-		newEdge := Edge[T]{
-			u:        e.u,
-			v:        e.v,
-			weight:   e.weight,
-			directed: true,
-		}
-		newEdges = append(newEdges, newEdge)
+		newEdges = append(newEdges, e.ToDirected())
 	}
 	return Graph[T]{
 		edges: newEdges,
@@ -95,7 +107,8 @@ func (g Graph[T]) GetNumberOfEdges() int {
 	return len(g.edges)
 }
 
-func (e Edge[T]) reverse() Edge[T] {
+// Reverses this edge, has no effect on an undirected edge
+func (e Edge[T]) Reverse() Edge[T] {
 	return Edge[T]{
 		u:        e.v,
 		v:        e.u,
@@ -112,7 +125,7 @@ func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 			returnEdges = append(returnEdges, e)
 		} else if !e.directed && g.nodeEqual(source, e.u) {
 			// We are going to reverse the direction of the edge
-			returnEdges = append(returnEdges, e.reverse())
+			returnEdges = append(returnEdges, e.Reverse())
 		}
 	}
 	return returnEdges
@@ -125,7 +138,7 @@ func (g Graph[T]) FindEdgesThatLeadFrom(source Node[T]) []Edge[T] {
 		if (e.directed && g.nodeEqual(source, e.u)) || (!e.directed && g.nodeEqual(source, e.u)) {
 			returnEdges = append(returnEdges, e)
 		} else if !e.directed && (g.nodeEqual(source, e.v)) {
-			returnEdges = append(returnEdges, e.reverse())
+			returnEdges = append(returnEdges, e.Reverse())
 		}
 	}
 	return returnEdges
