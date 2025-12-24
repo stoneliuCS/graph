@@ -16,9 +16,11 @@ its core design philosophy to be functional.
 ## Main Functionalities
 The goal of this library is to create a generic graph API with a bunch of useful (and commonly) needed functionalities
 these include
-- `DFS` _Depth First Search_, enables traversing the graph in a DFS manner
-- `BFS` _Breadth First Search_, enables traversing the graph in a BFS manner
-- `Map` _Map_, enables mapping/translating a graph of type `X` to a graph of type `Y`
+- `DFS` _Depth First Search_, enables traversing the graph in a DFS manner.
+- `BFS` _Breadth First Search_, enables traversing the graph in a BFS manner.
+- `Map` _MapGraph_, enables mapping/translating a graph of type `X` to a graph of type `Y`.
+- `Filter` _FilterGraph_, enables filtering of edges on this graph by a specific predicate.
+- `Cycle Detection` _ContainsCycle_ determines if a graph contains a cycle.
 
 ## API Design
 Every single method and function available in `graph` is pure and functional. Meaning that the resulting method

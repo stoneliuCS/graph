@@ -188,7 +188,7 @@ func TestCyclicGraph1(t *testing.T) {
 	assert.Equal(t, 1, g.FindIndegree(g.GetNodes()[1]))
 	assert.Equal(t, 1, g.FindIndegree(g.GetNodes()[2]))
 	assert.Equal(t, 1, g.FindIndegree(g.GetNodes()[3]))
-	// The outdegrees on each ndoe
+	// The outdegrees on each node
 	assert.Equal(t, 1, g.FindOutDegree(g.GetNodes()[0]))
 	assert.Equal(t, 1, g.FindOutDegree(g.GetNodes()[1]))
 	assert.Equal(t, 2, g.FindOutDegree(g.GetNodes()[2]))

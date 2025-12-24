@@ -285,6 +285,21 @@ func MapGraph[T any, U any](
 	}
 }
 
+// Filters the edges from this graph that both nodes on the edge must meet
+func FilterGraph[T any](graph Graph[T], filterFn func(Edge[T]) bool) Graph[T] {
+	newEdges := []Edge[T]{}
+	for _, edge := range graph.edges {
+		if filterFn(edge) {
+			newEdges = append(newEdges, edge)
+		}
+	}
+	return Graph[T]{
+		edges:          newEdges,
+		nodeComparator: graph.nodeComparator,
+		nodeEqual:      graph.nodeEqual,
+	}
+}
+
 // Finds the "in-degree" or the number of edges that lead to this source node.
 func (g Graph[T]) FindIndegree(source Node[T]) int {
 	return len(g.FindEdgesThatLeadTo(source))
