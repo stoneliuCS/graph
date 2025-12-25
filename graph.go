@@ -9,6 +9,7 @@ type Graph[T any] struct {
 	edges          []Edge[T]
 	nodeComparator func(n1 Node[T], n2 Node[T]) int
 	nodeEqual      func(n1 Node[T], n2 Node[T]) bool
+	nodeHash       func(n Node[T]) string
 }
 
 // Represents an edge in Graph
@@ -25,23 +26,29 @@ type Node[T any] struct {
 }
 
 // Creates a generic empty graph with the given comparator and equivalence functions
-func CreateWithEqAndCompFunc[T any](
+func CreateGraphFunc[T any](
 	comparator func(n1 Node[T], n2 Node[T]) int,
 	eqFn func(n1 Node[T], n2 Node[T]) bool,
+	hashFn func(n Node[T]) string,
 ) Graph[T] {
 	return Graph[T]{
 		edges:          []Edge[T]{},
 		nodeComparator: comparator,
 		nodeEqual:      eqFn,
+		nodeHash:       hashFn,
 	}
 }
 
 func (g Graph[T]) AddNodeComparator(comparator func(n1 Node[T], n2 Node[T]) int) Graph[T] {
-	return Graph[T]{edges: g.edges, nodeComparator: comparator, nodeEqual: g.nodeEqual}
+	return Graph[T]{edges: g.edges, nodeComparator: comparator, nodeEqual: g.nodeEqual, nodeHash: g.nodeHash}
 }
 
 func (g Graph[T]) AddNodeEqualFn(eqFn func(n1 Node[T], n2 Node[T]) bool) Graph[T] {
-	return Graph[T]{edges: g.edges, nodeComparator: g.nodeComparator, nodeEqual: eqFn}
+	return Graph[T]{edges: g.edges, nodeComparator: g.nodeComparator, nodeEqual: eqFn, nodeHash: g.nodeHash}
+}
+
+func (g Graph[T]) AddNodeHash(hash func(n Node[T]) string) Graph[T] {
+	return Graph[T]{edges: g.edges, nodeComparator: g.nodeComparator, nodeEqual: g.nodeEqual, nodeHash: hash}
 }
 
 // Computes a new graph after adding that edge to this graph. Leaves the original graph unmodified.
@@ -51,6 +58,7 @@ func (g Graph[T]) AddEdge(edge Edge[T]) Graph[T] {
 		edges:          newEdges,
 		nodeComparator: g.nodeComparator,
 		nodeEqual:      g.nodeEqual,
+		nodeHash:       g.nodeHash,
 	}
 }
 
@@ -60,6 +68,14 @@ func CreateEdge[T any](u Node[T], v Node[T]) Edge[T] {
 		u: u,
 		v: v,
 	}
+}
+
+func (e Edge[T]) U() Node[T] {
+	return e.u
+}
+
+func (e Edge[T]) V() Node[T] {
+	return e.v
 }
 
 func (e Edge[T]) ToDirected() Edge[T] {
@@ -102,6 +118,7 @@ func (g Graph[T]) ToDirected() Graph[T] {
 		edges:          newEdges,
 		nodeComparator: g.nodeComparator,
 		nodeEqual:      g.nodeEqual,
+		nodeHash:       g.nodeHash,
 	}
 }
 
@@ -265,6 +282,7 @@ func MapGraph[T any, U any](
 	mapFn func(Node[T]) Node[U],
 	comparator func(n1 Node[U], n2 Node[U]) int,
 	eqFn func(n1 Node[U], n2 Node[U]) bool,
+	hashFn func(n Node[U]) string,
 ) Graph[U] {
 	newEdges := []Edge[U]{}
 	for _, edge := range graph.edges {
@@ -282,6 +300,7 @@ func MapGraph[T any, U any](
 		edges:          newEdges,
 		nodeComparator: comparator,
 		nodeEqual:      eqFn,
+		nodeHash:       hashFn,
 	}
 }
 
@@ -297,16 +316,39 @@ func FilterGraph[T any](graph Graph[T], filterFn func(Edge[T]) bool) Graph[T] {
 		edges:          newEdges,
 		nodeComparator: graph.nodeComparator,
 		nodeEqual:      graph.nodeEqual,
+		nodeHash:       graph.nodeHash,
 	}
 }
 
 // Finds the "in-degree" or the number of edges that lead to this source node.
-func (g Graph[T]) FindIndegree(source Node[T]) int {
+func (g Graph[T]) FindInDegree(source Node[T]) int {
 	return len(g.FindEdgesThatLeadTo(source))
 }
 
 func (g Graph[T]) FindOutDegree(source Node[T]) int {
 	return len(g.FindEdgesThatLeadFrom(source))
+}
+
+// Returns all the nodes with indegrees of 0
+func (g Graph[T]) GetRootNodes() []Node[T] {
+	roots := []Node[T]{}
+	for _, node := range g.GetNodes() {
+		if g.FindInDegree(node) == 0 {
+			roots = append(roots, node)
+		}
+	}
+	return roots
+}
+
+// Returns all the nodes with out degrees of 0
+func (g Graph[T]) GetLeafNodes() []Node[T] {
+	roots := []Node[T]{}
+	for _, node := range g.GetNodes() {
+		if g.FindOutDegree(node) == 0 {
+			roots = append(roots, node)
+		}
+	}
+	return roots
 }
 
 // Determines if this graph contains a cycle.
@@ -338,4 +380,14 @@ func (g Graph[T]) ContainsCycle() bool {
 		}
 	}
 	return false
+}
+
+// Returns a mapping of each nodes neighbors with the supplied hash function used as the key.
+func (g Graph[T]) ToAdjacencyMap() map[string][]Node[T] {
+	adjMap := map[string][]Node[T]{}
+	for _, n := range g.GetNodes() {
+		neighbors := g.FindNeighboringNodes(n)
+		adjMap[g.nodeHash(n)] = neighbors
+	}
+	return adjMap
 }
