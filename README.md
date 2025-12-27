@@ -26,3 +26,9 @@ these include
 Every single method and function available in `graph` is pure and functional. Meaning that the resulting method
 application does not change the underlying graph, instead it returns a new graph underneath. HOWEVER, this does not
 gurantee that mutable data types will not be cloned.
+
+## Graphics Support
+Under the hood, _graph_ uses _Gio_ to render graph GUIs. If you wish to use the GUI methods available please install
+```bash
+go install gioui.org/cmd/gogio@latest
+```
