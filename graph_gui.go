@@ -1,37 +1,101 @@
 package graph
 
 import (
+	"image"
+	"image/color"
 	"log"
 	"os"
 
 	"gioui.org/app"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
+	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"gioui.org/widget/material"
 )
 
-var GUI_SP_WIDTH float32 = 800
-var GUI_SP_HEIGHT float32 = 800
+var width float32 = 800
+var height float32 = 800
+
+// Colors
+var (
+	blue  = color.NRGBA{R: 0x40, G: 0x40, B: 0xC0, A: 0xFF}
+	white = color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
+	grey  = color.NRGBA{R: 0xC0, G: 0xC0, B: 0xC0, A: 0xFF}
+)
+
+// Sizes
+var (
+	buttonSize = image.Pt(200, 90)
+)
 
 // Intializes some default settings for the GUI window
-func (g Graph[T]) guiInitialize(window *app.Window, theme *material.Theme) {
-	window.Option(app.Size(unit.Dp(GUI_SP_WIDTH), unit.Dp(GUI_SP_HEIGHT)))
+func (g Graph[T]) guiInitialize(window *app.Window) {
+	window.Option(app.Size(unit.Dp(width), unit.Dp(height)))
 }
 
-func (g Graph[T]) drawLayout(gtx layout.Context) {
-	layout.Flex{
-		Axis:      layout.Vertical,
-		Spacing:   layout.SpaceStart,
-		Alignment: layout.Middle,
-	}.Layout(gtx)
+func colorBox(gtx layout.Context, size image.Point, color color.NRGBA) layout.Dimensions {
+	defer clip.Rect{Max: size}.Push(gtx.Ops).Pop()
+	paint.ColorOp{Color: color}.Add(gtx.Ops)
+	paint.PaintOp{}.Add(gtx.Ops)
+	return layout.Dimensions{Size: size}
+}
+
+func colorRoundedPill(gtx layout.Context, size image.Point, color color.NRGBA) layout.Dimensions {
+	rect := image.Rectangle{Max: size}
+	rad := size.Y / 2
+	paint.FillShape(gtx.Ops, color, clip.UniformRRect(rect, rad).Op(gtx.Ops))
+	return layout.Dimensions{Size: size}
+}
+
+type button struct {
+	pressed bool
+	theme   *material.Theme
+}
+
+func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
+	col := blue
+	if b.pressed {
+		col = color.NRGBA{G: 0x80, A: 0xFF}
+		print("pressed!")
+	}
+	return layout.UniformInset(unit.Dp(15)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+			return colorRoundedPill(gtx, buttonSize, col)
+		}), layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+			label := material.Label(b.theme, unit.Sp(16), label)
+			label.Color = white
+			return label.Layout(gtx)
+		}))
+	})
+}
+
+// Draws the menu portion of the screen
+func drawMenu(gtx layout.Context, theme *material.Theme) layout.Dimensions {
+	return layout.Stack{Alignment: layout.NW}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+		return colorBox(gtx, gtx.Constraints.Max, grey)
+	}), layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+		button := button{pressed: false, theme: theme}
+		return button.Layout(gtx, "Add Node")
+	}))
+}
+
+func (g Graph[T]) drawLayout(gtx layout.Context, theme *material.Theme) {
+	leftMenu := layout.Flexed(0.25, func(gtx layout.Context) layout.Dimensions {
+		return drawMenu(gtx, theme)
+	})
+	mainView := layout.Flexed(0.7, func(gtx layout.Context) layout.Dimensions {
+		return colorBox(gtx, gtx.Constraints.Max, white)
+	})
+	layout.Flex{Axis: layout.Horizontal}.Layout(gtx, mainView, leftMenu)
 }
 
 // Main event loop handling
-func (g Graph[T]) handleFrameEvent(event app.FrameEvent, ops op.Ops) {
+func (g Graph[T]) handleFrameEvent(event app.FrameEvent, ops op.Ops, theme *material.Theme) {
 	gtx := app.NewContext(&ops, event)
 	// Initialize the layout
-	g.drawLayout(gtx)
+	g.drawLayout(gtx, theme)
 	// Finally draw the frame event onto the window.
 	event.Frame(gtx.Ops)
 }
@@ -45,15 +109,15 @@ func (g Graph[T]) handleDestroyEvent(event app.DestroyEvent) error {
 func (g Graph[T]) GUI() {
 	var run func(*app.Window) error
 	run = func(w *app.Window) error {
-		theme := material.NewTheme()
 		ops := op.Ops{}
-		g.guiInitialize(w, theme)
+		theme := material.NewTheme()
+		g.guiInitialize(w)
 		for {
 			switch e := w.Event().(type) {
 			case app.DestroyEvent:
 				return g.handleDestroyEvent(e)
 			case app.FrameEvent:
-				g.handleFrameEvent(e, ops)
+				g.handleFrameEvent(e, ops, theme)
 			}
 		}
 	}
