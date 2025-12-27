@@ -11,21 +11,15 @@ import (
 	"gioui.org/widget/material"
 )
 
-type gui struct {
-	window     *app.Window
-	operations op.Ops
-	theme      *material.Theme
-}
-
 var GUI_SP_WIDTH float32 = 800
 var GUI_SP_HEIGHT float32 = 800
 
 // Intializes some default settings for the GUI window
-func (g gui) initialize() {
-	g.window.Option(app.Size(unit.Dp(GUI_SP_WIDTH), unit.Dp(GUI_SP_HEIGHT)))
+func (g Graph[T]) guiInitialize(window *app.Window, theme *material.Theme) {
+	window.Option(app.Size(unit.Dp(GUI_SP_WIDTH), unit.Dp(GUI_SP_HEIGHT)))
 }
 
-func (g gui) layout(gtx layout.Context) {
+func (g Graph[T]) drawLayout(gtx layout.Context) {
 	layout.Flex{
 		Axis:    layout.Vertical,
 		Spacing: layout.SpaceStart,
@@ -33,15 +27,15 @@ func (g gui) layout(gtx layout.Context) {
 }
 
 // Main event loop handling
-func (g gui) handleFrameEvent(event app.FrameEvent) {
-	gtx := app.NewContext(&g.operations, event)
+func (g Graph[T]) handleFrameEvent(event app.FrameEvent, ops op.Ops) {
+	gtx := app.NewContext(&ops, event)
 	// Initialize the layout
-	g.layout(gtx)
+	g.drawLayout(gtx)
 	// Finally draw the frame event onto the window.
 	event.Frame(gtx.Ops)
 }
 
-func (g gui) handleDestroyEvent(event app.DestroyEvent) error {
+func (g Graph[T]) handleDestroyEvent(event app.DestroyEvent) error {
 	return event.Err
 }
 
@@ -51,18 +45,14 @@ func (g Graph[T]) GUI() {
 	var run func(*app.Window) error
 	run = func(w *app.Window) error {
 		theme := material.NewTheme()
-		gui := gui{
-			window:     w,
-			theme:      theme,
-			operations: op.Ops{},
-		}
-		gui.initialize()
+		ops := op.Ops{}
+		g.guiInitialize(w, theme)
 		for {
 			switch e := w.Event().(type) {
 			case app.DestroyEvent:
-				return gui.handleDestroyEvent(e)
+				return g.handleDestroyEvent(e)
 			case app.FrameEvent:
-				gui.handleFrameEvent(e)
+				g.handleFrameEvent(e, ops)
 			}
 		}
 	}
