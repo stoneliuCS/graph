@@ -1,16 +1,7 @@
 package graph
 
 import (
-	"image/color"
-	"os"
 	"slices"
-
-	"log"
-
-	"gioui.org/app"
-	"gioui.org/op"
-	"gioui.org/text"
-	"gioui.org/widget/material"
 )
 
 // Represents a graph of any structure or type.
@@ -404,36 +395,4 @@ func (g Graph[T]) ToAdjacencyMap() map[string][]Node[T] {
 // Checks if this graph is a directed acyclic graph
 func (g Graph[T]) IsDAG() bool {
 	return g.IsDirectedGraph() && !g.ContainsCycle()
-}
-
-// Renders an interactive GUI based off the current graph. Useful for visualization and debugging purposes.
-func (g Graph[T]) GUI() {
-	var run func(*app.Window) error
-	run = func(w *app.Window) error {
-		theme := material.NewTheme()
-		var ops op.Ops
-		for {
-			switch e := w.Event().(type) {
-			case app.DestroyEvent:
-				return e.Err
-			case app.FrameEvent:
-				gtx := app.NewContext(&ops, e)
-				title := material.H1(theme, "Hello, Gio")
-				maroon := color.NRGBA{R: 127, G: 0, B: 0, A: 255}
-				title.Color = maroon
-				title.Alignment = text.Middle
-				title.Layout(gtx)
-				e.Frame(gtx.Ops)
-			}
-		}
-	}
-	go func() {
-		window := new(app.Window)
-		err := run(window)
-		if err != nil {
-			log.Fatal(err)
-		}
-		os.Exit(0)
-	}()
-	app.Main()
 }
