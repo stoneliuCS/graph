@@ -395,4 +395,5 @@ func (g Graph[T]) ToAdjacencyMap() map[string][]Node[T] {
 // Checks if this graph is a directed acyclic graph
 func (g Graph[T]) IsDAG() bool {
 	return g.IsDirectedGraph() && !g.ContainsCycle()
+
 }
