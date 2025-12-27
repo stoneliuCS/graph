@@ -21,8 +21,9 @@ func (g Graph[T]) guiInitialize(window *app.Window, theme *material.Theme) {
 
 func (g Graph[T]) drawLayout(gtx layout.Context) {
 	layout.Flex{
-		Axis:    layout.Vertical,
-		Spacing: layout.SpaceStart,
+		Axis:      layout.Vertical,
+		Spacing:   layout.SpaceStart,
+		Alignment: layout.Middle,
 	}.Layout(gtx)
 }
 

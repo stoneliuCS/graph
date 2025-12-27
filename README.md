@@ -4,13 +4,17 @@ its core design philosophy to be functional.
 
 ```bash
 .
+├── cmd
+│   └── graph
+│       └── main.go
 ├── go.mod
 ├── go.sum
-├── graph_test.go # graph tests
-├── graph.go # Main graph module
+├── graph_gui.go
+├── graph_test.go
+├── graph.go
 └── README.md
 
-1 directory, 5 files
+3 directories, 7 files
 ```
 
 ## Main Functionalities
