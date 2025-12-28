@@ -7,6 +7,8 @@ import (
 	"os"
 
 	"gioui.org/app"
+	"gioui.org/io/event"
+	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -21,6 +23,7 @@ var height float32 = 800
 // Colors
 var (
 	blue  = color.NRGBA{R: 0x40, G: 0x40, B: 0xC0, A: 0xFF}
+	red   = color.NRGBA{R: 0xC0, G: 0x40, B: 0x40, A: 0xFF}
 	white = color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
 	grey  = color.NRGBA{R: 0xC0, G: 0xC0, B: 0xC0, A: 0xFF}
 )
@@ -49,20 +52,48 @@ func colorRoundedPill(gtx layout.Context, size image.Point, color color.NRGBA) l
 	return layout.Dimensions{Size: size}
 }
 
+func drawListModal[T any](gtx layout.Context, list []T) layout.Dimensions {
+	panic("Oops")
+}
+
 type button struct {
-	pressed bool
-	theme   *material.Theme
+	pressed      bool
+	theme        *material.Theme
+	color        color.NRGBA
+	pressedColor color.NRGBA
+	onPress      func()
 }
 
 func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
-	col := blue
+	clip.Rect{Max: buttonSize}.Push(gtx.Ops).Pop()
+	// Handle Input
+	{
+		event.Op(gtx.Ops, b)
+		pointer.CursorColResize.Add(gtx.Ops)
+		for {
+			ev, ok := gtx.Event(pointer.Filter{
+				Target: b,
+				Kinds:  pointer.Press | pointer.Drag | pointer.Release | pointer.Cancel,
+			})
+			if !ok {
+				break
+			}
+			e, ok := ev.(pointer.Event)
+			if !ok {
+				continue
+			}
+			switch e.Kind {
+			case pointer.Press:
+				println("I got pressed!")
+			}
+		}
+	}
 	if b.pressed {
-		col = color.NRGBA{G: 0x80, A: 0xFF}
-		print("pressed!")
+		b.color = b.pressedColor
 	}
 	return layout.UniformInset(unit.Dp(15)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-			return colorRoundedPill(gtx, buttonSize, col)
+			return colorRoundedPill(gtx, buttonSize, b.color)
 		}), layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			label := material.Label(b.theme, unit.Sp(16), label)
 			label.Color = white
@@ -72,18 +103,34 @@ func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
 }
 
 // Draws the menu portion of the screen
-func drawMenu(gtx layout.Context, theme *material.Theme) layout.Dimensions {
+func (g Graph[T]) drawMenu(gtx layout.Context, theme *material.Theme) layout.Dimensions {
+	onPressAllNodes := func() {
+		nodes := g.GetNodes()
+		drawListModal(gtx, nodes)
+	}
+	onPressAllEdges := func() {
+		edges := g.edges
+		drawListModal(gtx, edges)
+	}
 	return layout.Stack{Alignment: layout.NW}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 		return colorBox(gtx, gtx.Constraints.Max, grey)
-	}), layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-		button := button{pressed: false, theme: theme}
-		return button.Layout(gtx, "Add Node")
-	}))
+	}),
+		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+			return layout.Flex{}.Layout(gtx, layout.Flexed(0.5, func(gtx layout.Context) layout.Dimensions {
+				button := button{pressed: false, theme: theme, color: blue, onPress: onPressAllNodes, pressedColor: red}
+				return button.Layout(gtx, "View All Nodes")
+			}),
+				layout.Flexed(0.5, func(gtx layout.Context) layout.Dimensions {
+					button := button{pressed: false, theme: theme, color: blue, onPress: onPressAllEdges, pressedColor: red}
+					return button.Layout(gtx, "View All Edges")
+				}),
+			)
+		}))
 }
 
 func (g Graph[T]) drawLayout(gtx layout.Context, theme *material.Theme) {
-	leftMenu := layout.Flexed(0.25, func(gtx layout.Context) layout.Dimensions {
-		return drawMenu(gtx, theme)
+	leftMenu := layout.Flexed(0.3, func(gtx layout.Context) layout.Dimensions {
+		return g.drawMenu(gtx, theme)
 	})
 	mainView := layout.Flexed(0.7, func(gtx layout.Context) layout.Dimensions {
 		return colorBox(gtx, gtx.Constraints.Max, white)
