@@ -30,7 +30,8 @@ var (
 
 // Sizes
 var (
-	buttonSize = image.Pt(200, 90)
+	buttonSize          = image.Pt(200, 90)
+	buttonSizeClickable = buttonSize.Mul(2)
 )
 
 // Intializes some default settings for the GUI window
@@ -56,24 +57,29 @@ func drawListModal[T any](gtx layout.Context, list []T) layout.Dimensions {
 	panic("Oops")
 }
 
+// Hold all available buttons to press in the gui.
+type widgets struct {
+	nodeButton button
+	edgeButton button
+}
+
 type button struct {
-	pressed      bool
-	theme        *material.Theme
-	color        color.NRGBA
-	pressedColor color.NRGBA
-	onPress      func()
+	pressed        bool
+	theme          *material.Theme
+	pressedColor   color.NRGBA
+	unPressedColor color.NRGBA
+	onPress        func(gtx layout.Context)
 }
 
 func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
-	clip.Rect{Max: buttonSize}.Push(gtx.Ops).Pop()
+	defer clip.Rect{Max: buttonSizeClickable}.Push(gtx.Ops).Pop()
 	// Handle Input
 	{
 		event.Op(gtx.Ops, b)
-		pointer.CursorColResize.Add(gtx.Ops)
 		for {
 			ev, ok := gtx.Event(pointer.Filter{
 				Target: b,
-				Kinds:  pointer.Press | pointer.Drag | pointer.Release | pointer.Cancel,
+				Kinds:  pointer.Press | pointer.Cancel,
 			})
 			if !ok {
 				break
@@ -84,16 +90,21 @@ func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
 			}
 			switch e.Kind {
 			case pointer.Press:
-				println("I got pressed!")
+				b.pressed = true
+				b.onPress(gtx)
 			}
 		}
 	}
 	if b.pressed {
-		b.color = b.pressedColor
+		println("Button Pressed")
 	}
 	return layout.UniformInset(unit.Dp(15)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-			return colorRoundedPill(gtx, buttonSize, b.color)
+			if b.pressed {
+				return colorRoundedPill(gtx, buttonSize, b.pressedColor)
+			} else {
+				return colorRoundedPill(gtx, buttonSize, b.unPressedColor)
+			}
 		}), layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			label := material.Label(b.theme, unit.Sp(16), label)
 			label.Color = white
@@ -103,34 +114,24 @@ func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
 }
 
 // Draws the menu portion of the screen
-func (g Graph[T]) drawMenu(gtx layout.Context, theme *material.Theme) layout.Dimensions {
-	onPressAllNodes := func() {
-		nodes := g.GetNodes()
-		drawListModal(gtx, nodes)
-	}
-	onPressAllEdges := func() {
-		edges := g.edges
-		drawListModal(gtx, edges)
-	}
+func (g Graph[T]) drawMenu(gtx layout.Context, widgets *widgets) layout.Dimensions {
 	return layout.Stack{Alignment: layout.NW}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 		return colorBox(gtx, gtx.Constraints.Max, grey)
 	}),
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{}.Layout(gtx, layout.Flexed(0.5, func(gtx layout.Context) layout.Dimensions {
-				button := button{pressed: false, theme: theme, color: blue, onPress: onPressAllNodes, pressedColor: red}
-				return button.Layout(gtx, "View All Nodes")
+				return widgets.nodeButton.Layout(gtx, "View All Nodes")
 			}),
 				layout.Flexed(0.5, func(gtx layout.Context) layout.Dimensions {
-					button := button{pressed: false, theme: theme, color: blue, onPress: onPressAllEdges, pressedColor: red}
-					return button.Layout(gtx, "View All Edges")
+					return widgets.edgeButton.Layout(gtx, "View All Edges")
 				}),
 			)
 		}))
 }
 
-func (g Graph[T]) drawLayout(gtx layout.Context, theme *material.Theme) {
+func (g Graph[T]) drawLayout(gtx layout.Context, widgets *widgets) {
 	leftMenu := layout.Flexed(0.3, func(gtx layout.Context) layout.Dimensions {
-		return g.drawMenu(gtx, theme)
+		return g.drawMenu(gtx, widgets)
 	})
 	mainView := layout.Flexed(0.7, func(gtx layout.Context) layout.Dimensions {
 		return colorBox(gtx, gtx.Constraints.Max, white)
@@ -139,10 +140,10 @@ func (g Graph[T]) drawLayout(gtx layout.Context, theme *material.Theme) {
 }
 
 // Main event loop handling
-func (g Graph[T]) handleFrameEvent(event app.FrameEvent, ops op.Ops, theme *material.Theme) {
+func (g Graph[T]) handleFrameEvent(event app.FrameEvent, ops op.Ops, widgets *widgets) {
 	gtx := app.NewContext(&ops, event)
 	// Initialize the layout
-	g.drawLayout(gtx, theme)
+	g.drawLayout(gtx, widgets)
 	// Finally draw the frame event onto the window.
 	event.Frame(gtx.Ops)
 }
@@ -154,17 +155,47 @@ func (g Graph[T]) handleDestroyEvent(event app.DestroyEvent) error {
 // Renders an interactive GUI based off the current graph. Useful for visualization and debugging purposes. Must be run
 // in the main thread.
 func (g Graph[T]) GUI() {
+	// Initialize all widgets
+	var initializeWidgets func(theme *material.Theme) widgets
+	initializeWidgets = func(theme *material.Theme) widgets {
+		onPressAllNodes := func(gtx layout.Context) {
+			nodes := g.GetNodes()
+			drawListModal(gtx, nodes)
+		}
+		onPressAllEdges := func(gtx layout.Context) {
+			edges := g.edges
+			drawListModal(gtx, edges)
+		}
+		var widgets widgets
+		widgets.nodeButton = button{
+			pressed:        false,
+			theme:          theme,
+			onPress:        onPressAllNodes,
+			unPressedColor: blue,
+			pressedColor:   red,
+		}
+		widgets.edgeButton = button{
+			pressed:        false,
+			theme:          theme,
+			onPress:        onPressAllEdges,
+			unPressedColor: blue,
+			pressedColor:   red,
+		}
+		return widgets
+	}
+	// The main run method.
 	var run func(*app.Window) error
 	run = func(w *app.Window) error {
 		ops := op.Ops{}
 		theme := material.NewTheme()
 		g.guiInitialize(w)
+		widgets := initializeWidgets(theme)
 		for {
 			switch e := w.Event().(type) {
 			case app.DestroyEvent:
 				return g.handleDestroyEvent(e)
 			case app.FrameEvent:
-				g.handleFrameEvent(e, ops, theme)
+				g.handleFrameEvent(e, ops, &widgets)
 			}
 		}
 	}
