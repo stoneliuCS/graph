@@ -54,21 +54,31 @@ func colorRoundedPill(gtx layout.Context, size image.Point, color color.NRGBA) l
 }
 
 func drawListModal[T any](gtx layout.Context, list []T) layout.Dimensions {
-	panic("Oops")
+	return colorBox(gtx, gtx.Constraints.Max, blue)
 }
 
 // Hold all available buttons to press in the gui.
 type widgets struct {
-	nodeButton button
-	edgeButton button
+	nodeButton *button
+	edgeButton *button
+}
+
+func (w *widgets) resetAllPressedButtons() {
+	if w.nodeButton.pressed {
+		w.nodeButton.pressed = false
+		w.nodeButton.color = blue
+	}
+	if w.edgeButton.pressed {
+		w.edgeButton.pressed = false
+		w.edgeButton.color = blue
+	}
 }
 
 type button struct {
-	pressed        bool
-	theme          *material.Theme
-	pressedColor   color.NRGBA
-	unPressedColor color.NRGBA
-	onPress        func(gtx layout.Context)
+	pressed bool
+	theme   *material.Theme
+	onPress func(gtx layout.Context)
+	color   color.NRGBA
 }
 
 func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
@@ -91,20 +101,16 @@ func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
 			switch e.Kind {
 			case pointer.Press:
 				b.pressed = true
-				b.onPress(gtx)
 			}
 		}
 	}
 	if b.pressed {
-		println("Button Pressed")
+		b.color = red
+		b.onPress(gtx)
 	}
 	return layout.UniformInset(unit.Dp(15)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-			if b.pressed {
-				return colorRoundedPill(gtx, buttonSize, b.pressedColor)
-			} else {
-				return colorRoundedPill(gtx, buttonSize, b.unPressedColor)
-			}
+			return colorRoundedPill(gtx, buttonSize, b.color)
 		}), layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			label := material.Label(b.theme, unit.Sp(16), label)
 			label.Color = white
@@ -167,19 +173,17 @@ func (g Graph[T]) GUI() {
 			drawListModal(gtx, edges)
 		}
 		var widgets widgets
-		widgets.nodeButton = button{
-			pressed:        false,
-			theme:          theme,
-			onPress:        onPressAllNodes,
-			unPressedColor: blue,
-			pressedColor:   red,
+		widgets.nodeButton = &button{
+			pressed: false,
+			theme:   theme,
+			onPress: onPressAllNodes,
+			color:   blue,
 		}
-		widgets.edgeButton = button{
-			pressed:        false,
-			theme:          theme,
-			onPress:        onPressAllEdges,
-			unPressedColor: blue,
-			pressedColor:   red,
+		widgets.edgeButton = &button{
+			pressed: false,
+			theme:   theme,
+			onPress: onPressAllEdges,
+			color:   blue,
 		}
 		return widgets
 	}
@@ -191,6 +195,7 @@ func (g Graph[T]) GUI() {
 		g.guiInitialize(w)
 		widgets := initializeWidgets(theme)
 		for {
+			widgets.resetAllPressedButtons()
 			switch e := w.Event().(type) {
 			case app.DestroyEvent:
 				return g.handleDestroyEvent(e)
