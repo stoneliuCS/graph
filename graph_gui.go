@@ -63,17 +63,6 @@ type widgets struct {
 	edgeButton *button
 }
 
-func (w *widgets) resetAllPressedButtons() {
-	if w.nodeButton.pressed {
-		w.nodeButton.pressed = false
-		w.nodeButton.color = blue
-	}
-	if w.edgeButton.pressed {
-		w.edgeButton.pressed = false
-		w.edgeButton.color = blue
-	}
-}
-
 type button struct {
 	pressed bool
 	theme   *material.Theme
@@ -89,7 +78,7 @@ func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
 		for {
 			ev, ok := gtx.Event(pointer.Filter{
 				Target: b,
-				Kinds:  pointer.Press | pointer.Cancel,
+				Kinds:  pointer.Press | pointer.Cancel | pointer.Release,
 			})
 			if !ok {
 				break
@@ -101,12 +90,16 @@ func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
 			switch e.Kind {
 			case pointer.Press:
 				b.pressed = true
+			case pointer.Release:
+				b.pressed = false
 			}
 		}
 	}
 	if b.pressed {
 		b.color = red
 		b.onPress(gtx)
+	} else {
+		b.color = blue
 	}
 	return layout.UniformInset(unit.Dp(15)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
@@ -195,7 +188,6 @@ func (g Graph[T]) GUI() {
 		g.guiInitialize(w)
 		widgets := initializeWidgets(theme)
 		for {
-			widgets.resetAllPressedButtons()
 			switch e := w.Event().(type) {
 			case app.DestroyEvent:
 				return g.handleDestroyEvent(e)
