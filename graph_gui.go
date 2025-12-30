@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"log"
@@ -22,16 +23,29 @@ var height float32 = 800
 
 // Colors
 var (
-	blue  = color.NRGBA{R: 0x40, G: 0x40, B: 0xC0, A: 0xFF}
-	red   = color.NRGBA{R: 0xC0, G: 0x40, B: 0x40, A: 0xFF}
-	white = color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
-	grey  = color.NRGBA{R: 0xC0, G: 0xC0, B: 0xC0, A: 0xFF}
+	blue     = color.NRGBA{R: 0x40, G: 0x40, B: 0xC0, A: 0xFF}
+	red      = color.NRGBA{R: 0xC0, G: 0x40, B: 0x40, A: 0xFF}
+	white    = color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
+	grey     = color.NRGBA{R: 0xC0, G: 0xC0, B: 0xC0, A: 0xFF}
+	greyDark = color.NRGBA{R: 0xB0, G: 0xB0, B: 0xB0, A: 0xFF}
+	black    = color.NRGBA{R: 0, G: 0, B: 0, A: 255}
 )
 
 // Sizes
 var (
 	buttonSize          = image.Pt(200, 90)
 	buttonSizeClickable = buttonSize.Mul(2)
+	textButtonSize      = 12
+	modalTitleSize      = unit.Sp(20)
+	defaultInset        = layout.UniformInset(0)
+)
+
+// Color Constants
+var (
+	buttonUnpressedColor = blue
+	buttonPressedColor   = red
+	modalContainerColor  = greyDark
+	modalTitleColor      = black
 )
 
 // Intializes some default settings for the GUI window
@@ -53,21 +67,20 @@ func colorRoundedPill(gtx layout.Context, size image.Point, color color.NRGBA) l
 	return layout.Dimensions{Size: size}
 }
 
-func drawListModal[T any](gtx layout.Context, list []T) layout.Dimensions {
-	return colorBox(gtx, gtx.Constraints.Max, blue)
-}
-
 // Hold all available buttons to press in the gui.
 type widgets struct {
-	nodeButton *button
-	edgeButton *button
+	nodeButton      *button
+	edgeButton      *button
+	modalExitButton *button
+	modalNodeList   *layout.List
+	modalEdgeList   *layout.List
 }
 
 type button struct {
-	pressed bool
-	theme   *material.Theme
-	onPress func(gtx layout.Context)
-	color   color.NRGBA
+	pressed   bool
+	theme     *material.Theme
+	color     color.NRGBA
+	onPressed func()
 }
 
 func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
@@ -90,26 +103,23 @@ func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
 			switch e.Kind {
 			case pointer.Press:
 				b.pressed = true
-			case pointer.Release:
-				b.pressed = false
 			}
 		}
 	}
 	if b.pressed {
-		b.color = red
-		b.onPress(gtx)
+		b.color = buttonPressedColor
+		b.onPressed()
 	} else {
-		b.color = blue
+		b.color = buttonUnpressedColor
 	}
-	return layout.UniformInset(unit.Dp(15)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-			return colorRoundedPill(gtx, buttonSize, b.color)
-		}), layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-			label := material.Label(b.theme, unit.Sp(16), label)
-			label.Color = white
-			return label.Layout(gtx)
-		}))
-	})
+	return layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+		return colorRoundedPill(gtx, buttonSize, b.color)
+	}), layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+		label := material.Label(b.theme, unit.Sp(textButtonSize), label)
+		label.Color = white
+		return label.Layout(gtx)
+	}))
+
 }
 
 // Draws the menu portion of the screen
@@ -128,6 +138,58 @@ func (g Graph[T]) drawMenu(gtx layout.Context, widgets *widgets) layout.Dimensio
 		}))
 }
 
+func drawModalFromButtonListFormat[T any](
+	gtx layout.Context,
+	modalTitle string,
+	b *button,
+	widgets *widgets,
+	listToDraw []T,
+	modalList *layout.List,
+) layout.Dimensions {
+	size := gtx.Constraints.Max.Div(2)
+	// Restrain the constraints to be this exact size.
+	gtx.Constraints = layout.Exact(size)
+	modalContainer := layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+		return defaultInset.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			return colorBox(gtx, size, modalContainerColor)
+		})
+	})
+	widgets.modalExitButton.onPressed = func() {
+		b.pressed = false
+		widgets.modalExitButton.pressed = false
+	}
+	var titleAndExitButton layout.Widget = func(gtx layout.Context) layout.Dimensions {
+		title := layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+			modalTitle := material.Label(b.theme, modalTitleSize, modalTitle)
+			modalTitle.Color = modalTitleColor
+			return modalTitle.Layout(gtx)
+		})
+		exitButton := layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return widgets.modalExitButton.Layout(gtx, "Exit")
+		})
+		return layout.Flex{
+			Axis:    layout.Horizontal,
+			Spacing: layout.SpaceBetween,
+		}.Layout(gtx, title, exitButton)
+	}
+	var mainContent layout.Widget = func(gtx layout.Context) layout.Dimensions {
+		itemsToDraw := listToDraw
+		return modalList.Layout(gtx, len(itemsToDraw), func(gtx layout.Context, index int) layout.Dimensions {
+			itemToDraw := itemsToDraw[index]
+			s := fmt.Sprintf("%+v", itemToDraw)
+			lbl := material.Label(b.theme, unit.Sp(14), s)
+			return lbl.Layout(gtx)
+		})
+	}
+	content := layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+		return layout.Flex{Axis: layout.Vertical, Spacing: layout.SpaceBetween}.Layout(gtx,
+			layout.Rigid(titleAndExitButton),
+			layout.Flexed(1, mainContent),
+		)
+	})
+	return layout.Stack{Alignment: layout.Center}.Layout(gtx, modalContainer, content)
+}
+
 func (g Graph[T]) drawLayout(gtx layout.Context, widgets *widgets) {
 	leftMenu := layout.Flexed(0.3, func(gtx layout.Context) layout.Dimensions {
 		return g.drawMenu(gtx, widgets)
@@ -135,7 +197,36 @@ func (g Graph[T]) drawLayout(gtx layout.Context, widgets *widgets) {
 	mainView := layout.Flexed(0.7, func(gtx layout.Context) layout.Dimensions {
 		return colorBox(gtx, gtx.Constraints.Max, white)
 	})
-	layout.Flex{Axis: layout.Horizontal}.Layout(gtx, mainView, leftMenu)
+	main := layout.Flex{Axis: layout.Horizontal}.Layout(gtx, mainView, leftMenu)
+	// Handle main UI stack handling
+	layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+		return main
+	}), layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+		// This callback only renders if a modal button has been pressed
+		// Handle modal drawings
+		if !widgets.nodeButton.pressed && !widgets.edgeButton.pressed {
+			return layout.Dimensions{}
+		}
+		if widgets.nodeButton.pressed {
+			return drawModalFromButtonListFormat(
+				gtx,
+				"View All Nodes",
+				widgets.nodeButton,
+				widgets,
+				g.GetNodes(),
+				widgets.modalNodeList,
+			)
+		} else {
+			return drawModalFromButtonListFormat(
+				gtx,
+				"View all Edges",
+				widgets.edgeButton,
+				widgets,
+				g.edges,
+				widgets.modalEdgeList,
+			)
+		}
+	}))
 }
 
 // Main event loop handling
@@ -157,27 +248,27 @@ func (g Graph[T]) GUI() {
 	// Initialize all widgets
 	var initializeWidgets func(theme *material.Theme) widgets
 	initializeWidgets = func(theme *material.Theme) widgets {
-		onPressAllNodes := func(gtx layout.Context) {
-			nodes := g.GetNodes()
-			drawListModal(gtx, nodes)
-		}
-		onPressAllEdges := func(gtx layout.Context) {
-			edges := g.edges
-			drawListModal(gtx, edges)
-		}
 		var widgets widgets
 		widgets.nodeButton = &button{
-			pressed: false,
-			theme:   theme,
-			onPress: onPressAllNodes,
-			color:   blue,
+			pressed:   false,
+			theme:     theme,
+			color:     blue,
+			onPressed: func() {},
 		}
 		widgets.edgeButton = &button{
-			pressed: false,
-			theme:   theme,
-			onPress: onPressAllEdges,
-			color:   blue,
+			pressed:   false,
+			theme:     theme,
+			color:     blue,
+			onPressed: func() {},
 		}
+		widgets.modalExitButton = &button{
+			pressed:   false,
+			theme:     theme,
+			color:     blue,
+			onPressed: func() {},
+		}
+		widgets.modalNodeList = &layout.List{Axis: layout.Vertical}
+		widgets.modalEdgeList = &layout.List{Axis: layout.Vertical}
 		return widgets
 	}
 	// The main run method.
