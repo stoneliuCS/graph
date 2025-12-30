@@ -38,6 +38,7 @@ var (
 	textButtonSize      = 12
 	modalTitleSize      = unit.Sp(20)
 	defaultInset        = layout.UniformInset(0)
+	textDefaultSize     = unit.Sp(18)
 )
 
 // Color Constants
@@ -71,6 +72,8 @@ func colorRoundedPill(gtx layout.Context, size image.Point, color color.NRGBA) l
 type widgets struct {
 	nodeButton      *button
 	edgeButton      *button
+	dfsButton       *button
+	bfsButton       *button
 	modalExitButton *button
 	modalNodeList   *layout.List
 	modalEdgeList   *layout.List
@@ -124,7 +127,7 @@ func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
 
 // Draws the menu portion of the screen
 func (g Graph[T]) drawMenu(gtx layout.Context, widgets *widgets) layout.Dimensions {
-	return layout.Stack{Alignment: layout.NW}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+	return layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 		return colorBox(gtx, gtx.Constraints.Max, grey)
 	}),
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
@@ -135,7 +138,17 @@ func (g Graph[T]) drawMenu(gtx layout.Context, widgets *widgets) layout.Dimensio
 					return widgets.edgeButton.Layout(gtx, "View All Edges")
 				}),
 			)
-		}))
+		}),
+		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+			return layout.Flex{}.Layout(gtx, layout.Flexed(0.5, func(gtx layout.Context) layout.Dimensions {
+				return widgets.nodeButton.Layout(gtx, "View All Nodes")
+			}),
+				layout.Flexed(0.5, func(gtx layout.Context) layout.Dimensions {
+					return widgets.edgeButton.Layout(gtx, "View All Edges")
+				}),
+			)
+		}),
+	)
 }
 
 func drawModalFromButtonListFormat[T any](
@@ -177,7 +190,7 @@ func drawModalFromButtonListFormat[T any](
 		return modalList.Layout(gtx, len(itemsToDraw), func(gtx layout.Context, index int) layout.Dimensions {
 			itemToDraw := itemsToDraw[index]
 			s := fmt.Sprintf("%+v", itemToDraw)
-			lbl := material.Label(b.theme, unit.Sp(14), s)
+			lbl := material.Label(b.theme, textDefaultSize, s)
 			return lbl.Layout(gtx)
 		})
 	}
@@ -256,6 +269,18 @@ func (g Graph[T]) GUI() {
 			onPressed: func() {},
 		}
 		widgets.edgeButton = &button{
+			pressed:   false,
+			theme:     theme,
+			color:     blue,
+			onPressed: func() {},
+		}
+		widgets.dfsButton = &button{
+			pressed:   false,
+			theme:     theme,
+			color:     blue,
+			onPressed: func() {},
+		}
+		widgets.bfsButton = &button{
 			pressed:   false,
 			theme:     theme,
 			color:     blue,
