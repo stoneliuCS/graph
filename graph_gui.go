@@ -39,6 +39,8 @@ var (
 	modalTitleSize      = unit.Sp(20)
 	defaultInset        = layout.UniformInset(0)
 	textDefaultSize     = unit.Sp(18)
+	nodeCircleSize      = image.Pt(30, 30)
+	edgeWidth           = image.Pt(10, 10)
 )
 
 // Color Constants
@@ -47,6 +49,7 @@ var (
 	buttonPressedColor   = red
 	modalContainerColor  = greyDark
 	modalTitleColor      = black
+	nodeColor            = black
 )
 
 // Intializes some default settings for the GUI window
@@ -77,6 +80,8 @@ type widgets struct {
 	modalExitButton *button
 	modalNodeList   *layout.List
 	modalEdgeList   *layout.List
+	mainTheme       *material.Theme
+	graphRender     *layout.List
 }
 
 type button struct {
@@ -189,9 +194,7 @@ func drawModalFromButtonListFormat[T any](
 		itemsToDraw := listToDraw
 		return modalList.Layout(gtx, len(itemsToDraw), func(gtx layout.Context, index int) layout.Dimensions {
 			itemToDraw := itemsToDraw[index]
-			s := fmt.Sprintf("%+v", itemToDraw)
-			lbl := material.Label(b.theme, textDefaultSize, s)
-			return lbl.Layout(gtx)
+			return renderAnyToText(gtx, b.theme, itemToDraw)
 		})
 	}
 	content := layout.Stacked(func(gtx layout.Context) layout.Dimensions {
@@ -203,23 +206,81 @@ func drawModalFromButtonListFormat[T any](
 	return layout.Stack{Alignment: layout.Center}.Layout(gtx, modalContainer, content)
 }
 
-func (g Graph[T]) drawLayout(gtx layout.Context, widgets *widgets) {
-	leftMenu := layout.Flexed(0.3, func(gtx layout.Context) layout.Dimensions {
-		return g.drawMenu(gtx, widgets)
-	})
-	mainView := layout.Flexed(0.7, func(gtx layout.Context) layout.Dimensions {
+func renderAnyToText[T any](gtx layout.Context, theme *material.Theme, any T) layout.Dimensions {
+	s := fmt.Sprintf("%+v", any)
+	lbl := material.Label(theme, textDefaultSize, s)
+	return lbl.Layout(gtx)
+}
+
+// Renders this node as a circle with its value as its label.
+func (n Node[T]) renderNodeWidget(widgets *widgets) layout.Widget {
+	size := nodeCircleSize.Mul(2)
+	return func(gtx layout.Context) layout.Dimensions {
+		labelWidget := func(gtx layout.Context) layout.Dimensions {
+			label := renderAnyToText(gtx, widgets.mainTheme, n.GetVal())
+			return label
+		}
+		circleWidget := func(gtx layout.Context) layout.Dimensions {
+			defer clip.Rect{Max: size}.Push(gtx.Ops).Pop()
+			paint.FillShape(gtx.Ops, nodeColor, clip.Ellipse(image.Rectangle{Max: size}).Op(gtx.Ops))
+			return layout.Dimensions{Size: size}
+		}
+		return layout.Stack{Alignment: layout.Center}.Layout(gtx,
+			layout.Stacked(circleWidget),
+			layout.Stacked(labelWidget),
+		)
+	}
+}
+
+func (e Edge[T]) renderEdge(gtx layout.Context, widgets *widgets) layout.Dimensions {
+	u := e.U().renderNodeWidget(widgets)
+	v := e.V().renderNodeWidget(widgets)
+	// Now draw a single line between them horizonally
+	var edgeWidget layout.Widget = func(gtx layout.Context) layout.Dimensions {
+		size := edgeWidth
+		defer clip.Rect{Max: size}.Push(gtx.Ops).Pop()
+		paint.ColorOp{Color: black}.Add(gtx.Ops)
+		paint.PaintOp{}.Add(gtx.Ops)
+		return layout.Dimensions{Size: size}
+	}
+	return layout.Flex{Alignment: layout.Start}.Layout(gtx,
+		layout.Rigid(u),
+		layout.Rigid(edgeWidget),
+		layout.Rigid(v),
+	)
+}
+
+// Main function for rendering each node
+func (g Graph[T]) renderGraph(gtx layout.Context, widgets *widgets) layout.Dimensions {
+	// First we render each edge per line
+	var background layout.Widget = func(gtx layout.Context) layout.Dimensions {
 		return colorBox(gtx, gtx.Constraints.Max, white)
-	})
-	main := layout.Flex{Axis: layout.Horizontal}.Layout(gtx, mainView, leftMenu)
+	}
+	var graph layout.Widget = func(gtx layout.Context) layout.Dimensions {
+		return widgets.graphRender.Layout(gtx, len(g.edges), func(gtx layout.Context, index int) layout.Dimensions {
+			edgeToRender := g.edges[index]
+			return edgeToRender.renderEdge(gtx, widgets)
+		})
+	}
+	return layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(background), layout.Stacked(graph))
+}
+
+func (g Graph[T]) drawLayout(gtx layout.Context, widgets *widgets) {
+	var leftMenu layout.Widget = func(gtx layout.Context) layout.Dimensions {
+		return g.drawMenu(gtx, widgets)
+	}
+	var mainView layout.Widget = func(gtx layout.Context) layout.Dimensions {
+		// Wrap the main view in a scrollable list
+		return g.renderGraph(gtx, widgets)
+	}
+	main := layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+		layout.Flexed(0.75, mainView),
+		layout.Flexed(0.25, leftMenu))
 	// Handle main UI stack handling
 	layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 		return main
 	}), layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-		// This callback only renders if a modal button has been pressed
-		// Handle modal drawings
-		if !widgets.nodeButton.pressed && !widgets.edgeButton.pressed {
-			return layout.Dimensions{}
-		}
+		// This callback only renders if any button has been pressed
 		if widgets.nodeButton.pressed {
 			return drawModalFromButtonListFormat(
 				gtx,
@@ -229,7 +290,7 @@ func (g Graph[T]) drawLayout(gtx layout.Context, widgets *widgets) {
 				g.GetNodes(),
 				widgets.modalNodeList,
 			)
-		} else {
+		} else if widgets.edgeButton.pressed {
 			return drawModalFromButtonListFormat(
 				gtx,
 				"View all Edges",
@@ -238,6 +299,8 @@ func (g Graph[T]) drawLayout(gtx layout.Context, widgets *widgets) {
 				g.edges,
 				widgets.modalEdgeList,
 			)
+		} else {
+			return layout.Dimensions{}
 		}
 	}))
 }
@@ -292,8 +355,10 @@ func (g Graph[T]) GUI() {
 			color:     blue,
 			onPressed: func() {},
 		}
+		widgets.graphRender = &layout.List{Axis: layout.Vertical}
 		widgets.modalNodeList = &layout.List{Axis: layout.Vertical}
 		widgets.modalEdgeList = &layout.List{Axis: layout.Vertical}
+		widgets.mainTheme = theme
 		return widgets
 	}
 	// The main run method.
