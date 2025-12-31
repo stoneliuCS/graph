@@ -86,12 +86,11 @@ type widgets struct {
 
 type button struct {
 	pressed   bool
-	theme     *material.Theme
 	color     color.NRGBA
 	onPressed func()
 }
 
-func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
+func (b *button) Layout(gtx layout.Context, label string, theme *material.Theme) layout.Dimensions {
 	defer clip.Rect{Max: buttonSizeClickable}.Push(gtx.Ops).Pop()
 	// Handle Input
 	{
@@ -123,7 +122,7 @@ func (b *button) Layout(gtx layout.Context, label string) layout.Dimensions {
 	return layout.Stack{Alignment: layout.Center}.Layout(gtx, layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 		return colorRoundedPill(gtx, buttonSize, b.color)
 	}), layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-		label := material.Label(b.theme, unit.Sp(textButtonSize), label)
+		label := material.Label(theme, unit.Sp(textButtonSize), label)
 		label.Color = white
 		return label.Layout(gtx)
 	}))
@@ -137,19 +136,10 @@ func (g Graph[T]) drawMenu(gtx layout.Context, widgets *widgets) layout.Dimensio
 	}),
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{}.Layout(gtx, layout.Flexed(0.5, func(gtx layout.Context) layout.Dimensions {
-				return widgets.nodeButton.Layout(gtx, "View All Nodes")
+				return widgets.nodeButton.Layout(gtx, "View All Nodes", widgets.mainTheme)
 			}),
 				layout.Flexed(0.5, func(gtx layout.Context) layout.Dimensions {
-					return widgets.edgeButton.Layout(gtx, "View All Edges")
-				}),
-			)
-		}),
-		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-			return layout.Flex{}.Layout(gtx, layout.Flexed(0.5, func(gtx layout.Context) layout.Dimensions {
-				return widgets.nodeButton.Layout(gtx, "View All Nodes")
-			}),
-				layout.Flexed(0.5, func(gtx layout.Context) layout.Dimensions {
-					return widgets.edgeButton.Layout(gtx, "View All Edges")
+					return widgets.edgeButton.Layout(gtx, "View All Edges", widgets.mainTheme)
 				}),
 			)
 		}),
@@ -178,12 +168,12 @@ func drawModalFromButtonListFormat[T any](
 	}
 	var titleAndExitButton layout.Widget = func(gtx layout.Context) layout.Dimensions {
 		title := layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-			modalTitle := material.Label(b.theme, modalTitleSize, modalTitle)
+			modalTitle := material.Label(widgets.mainTheme, modalTitleSize, modalTitle)
 			modalTitle.Color = modalTitleColor
 			return modalTitle.Layout(gtx)
 		})
 		exitButton := layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return widgets.modalExitButton.Layout(gtx, "Exit")
+			return widgets.modalExitButton.Layout(gtx, "Exit", widgets.mainTheme)
 		})
 		return layout.Flex{
 			Axis:    layout.Horizontal,
@@ -194,7 +184,7 @@ func drawModalFromButtonListFormat[T any](
 		itemsToDraw := listToDraw
 		return modalList.Layout(gtx, len(itemsToDraw), func(gtx layout.Context, index int) layout.Dimensions {
 			itemToDraw := itemsToDraw[index]
-			return renderAnyToText(gtx, b.theme, itemToDraw)
+			return renderAnyToText(gtx, widgets.mainTheme, itemToDraw)
 		})
 	}
 	content := layout.Stacked(func(gtx layout.Context) layout.Dimensions {
@@ -327,31 +317,26 @@ func (g Graph[T]) GUI() {
 		var widgets widgets
 		widgets.nodeButton = &button{
 			pressed:   false,
-			theme:     theme,
 			color:     blue,
 			onPressed: func() {},
 		}
 		widgets.edgeButton = &button{
 			pressed:   false,
-			theme:     theme,
 			color:     blue,
 			onPressed: func() {},
 		}
 		widgets.dfsButton = &button{
 			pressed:   false,
-			theme:     theme,
 			color:     blue,
 			onPressed: func() {},
 		}
 		widgets.bfsButton = &button{
 			pressed:   false,
-			theme:     theme,
 			color:     blue,
 			onPressed: func() {},
 		}
 		widgets.modalExitButton = &button{
 			pressed:   false,
-			theme:     theme,
 			color:     blue,
 			onPressed: func() {},
 		}
