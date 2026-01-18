@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"gioui.org/app"
+	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
@@ -39,8 +40,8 @@ var (
 	modalTitleSize      = unit.Sp(20)
 	defaultInset        = layout.UniformInset(0)
 	textDefaultSize     = unit.Sp(18)
-	nodeCircleSize      = image.Pt(30, 30)
-	edgeWidth           = image.Pt(10, 10)
+	nodeCircleSize      = image.Pt(50, 50)
+	edgeSize            = image.Pt(50, 5)
 )
 
 // Color Constants
@@ -49,7 +50,7 @@ var (
 	buttonPressedColor   = red
 	modalContainerColor  = greyDark
 	modalTitleColor      = black
-	nodeColor            = black
+	nodeColor            = grey
 )
 
 // Intializes some default settings for the GUI window
@@ -227,13 +228,22 @@ func (e Edge[T]) renderEdge(gtx layout.Context, widgets *widgets) layout.Dimensi
 	v := e.V().renderNodeWidget(widgets)
 	// Now draw a single line between them horizonally
 	var edgeWidget layout.Widget = func(gtx layout.Context) layout.Dimensions {
-		size := edgeWidth
-		defer clip.Rect{Max: size}.Push(gtx.Ops).Pop()
+		lineSize := edgeSize
+		op.Offset(image.Pt(0, 0))
+		defer clip.Rect{Max: edgeSize}.Push(gtx.Ops).Pop()
+		paint.FillShape(gtx.Ops, black, clip.Rect{Max: lineSize}.Op())
 		paint.ColorOp{Color: black}.Add(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
-		return layout.Dimensions{Size: size}
+		var tri clip.Path
+		tri.Begin(gtx.Ops)
+		tri.MoveTo(f32.Pt(0, 0))
+		tri.LineTo(f32.Pt(20, 10))
+		tri.LineTo(f32.Pt(0, 20))
+		tri.Close()
+		paint.FillShape(gtx.Ops, color.NRGBA{A: 255}, clip.Outline{Path: tri.End()}.Op())
+		return layout.Dimensions{Size: edgeSize}
 	}
-	return layout.Flex{Alignment: layout.Start}.Layout(gtx,
+	return layout.Flex{Alignment: layout.Middle, Spacing: layout.SpaceBetween}.Layout(gtx,
 		layout.Rigid(u),
 		layout.Rigid(edgeWidget),
 		layout.Rigid(v),
