@@ -10,14 +10,14 @@ type Graph[T any] struct {
 	nodeComparator func(n1 Node[T], n2 Node[T]) int
 	nodeEqual      func(n1 Node[T], n2 Node[T]) bool
 	nodeHash       func(n Node[T]) string
+	directed       bool
 }
 
 // Represents an edge in Graph
 type Edge[T any] struct {
-	u        Node[T]
-	v        Node[T]
-	directed bool
-	weight   float64
+	u      Node[T]
+	v      Node[T]
+	weight float64
 }
 
 // Represents a node in Graph
@@ -78,21 +78,11 @@ func (e Edge[T]) V() Node[T] {
 	return e.v
 }
 
-func (e Edge[T]) ToDirected() Edge[T] {
-	return Edge[T]{
-		u:        e.u,
-		v:        e.v,
-		directed: true,
-		weight:   e.weight,
-	}
-}
-
 func (e Edge[T]) AddWeight(w float64) Edge[T] {
 	return Edge[T]{
-		u:        e.u,
-		v:        e.v,
-		directed: e.directed,
-		weight:   w,
+		u:      e.u,
+		v:      e.v,
+		weight: w,
 	}
 }
 
@@ -110,15 +100,12 @@ func (n Node[T]) GetVal() T {
 Creates a new graph that interprets all edges as directed. I.e. makes all edges e <-> v to u -> v
 */
 func (g Graph[T]) ToDirected() Graph[T] {
-	newEdges := []Edge[T]{}
-	for _, e := range g.edges {
-		newEdges = append(newEdges, e.ToDirected())
-	}
 	return Graph[T]{
-		edges:          newEdges,
+		edges:          g.edges,
 		nodeComparator: g.nodeComparator,
 		nodeEqual:      g.nodeEqual,
 		nodeHash:       g.nodeHash,
+		directed:       true,
 	}
 }
 
@@ -129,10 +116,9 @@ func (g Graph[T]) GetNumberOfEdges() int {
 // Reverses this edge, has no effect on an undirected edge
 func (e Edge[T]) Reverse() Edge[T] {
 	return Edge[T]{
-		u:        e.v,
-		v:        e.u,
-		directed: e.directed,
-		weight:   e.weight,
+		u:      e.v,
+		v:      e.u,
+		weight: e.weight,
 	}
 }
 
@@ -140,9 +126,9 @@ func (e Edge[T]) Reverse() Edge[T] {
 func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 	returnEdges := []Edge[T]{}
 	for _, e := range g.edges {
-		if e.directed && g.nodeEqual(source, e.v) || (!e.directed && (g.nodeEqual(source, e.v))) {
+		if g.directed && g.nodeEqual(source, e.v) || (!g.directed && (g.nodeEqual(source, e.v))) {
 			returnEdges = append(returnEdges, e)
-		} else if !e.directed && g.nodeEqual(source, e.u) {
+		} else if !g.directed && g.nodeEqual(source, e.u) {
 			// We are going to reverse the direction of the edge
 			returnEdges = append(returnEdges, e.Reverse())
 		}
@@ -154,31 +140,18 @@ func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 func (g Graph[T]) FindEdgesThatLeadFrom(source Node[T]) []Edge[T] {
 	returnEdges := []Edge[T]{}
 	for _, e := range g.edges {
-		if (e.directed && g.nodeEqual(source, e.u)) || (!e.directed && g.nodeEqual(source, e.u)) {
+		if (g.directed && g.nodeEqual(source, e.u)) || (!g.directed && g.nodeEqual(source, e.u)) {
 			returnEdges = append(returnEdges, e)
-		} else if !e.directed && (g.nodeEqual(source, e.v)) {
+		} else if !g.directed && (g.nodeEqual(source, e.v)) {
 			returnEdges = append(returnEdges, e.Reverse())
 		}
 	}
 	return returnEdges
 }
 
-// Checks if this graph is directed or undirected. Panics on an empty graph.
+// Checks if this graph is directed or undirected.
 func (g Graph[T]) IsDirectedGraph() bool {
-	if len(g.edges) == 0 {
-		panic("No edges in this graph.")
-	}
-	allMap := []bool{}
-	var firstVal *bool = nil
-	for _, e := range g.edges {
-		allMap = append(allMap, e.directed)
-		if firstVal == nil {
-			firstVal = &e.directed
-		} else if *firstVal != e.directed {
-			panic("Inconsistant Checks")
-		}
-	}
-	return allMap[0]
+	return g.directed
 }
 
 func (g Graph[T]) FindNeighboringNodes(source Node[T]) []Node[T] {
@@ -289,10 +262,9 @@ func MapGraph[T any, U any](
 		newU := mapFn(edge.u)
 		newV := mapFn(edge.v)
 		newEdge := Edge[U]{
-			u:        newU,
-			v:        newV,
-			directed: edge.directed,
-			weight:   edge.weight,
+			u:      newU,
+			v:      newV,
+			weight: edge.weight,
 		}
 		newEdges = append(newEdges, newEdge)
 	}
