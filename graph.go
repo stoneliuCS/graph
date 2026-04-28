@@ -6,11 +6,15 @@ import (
 
 // Represents a graph of any structure or type.
 type Graph[T any] struct {
-	edges          []Edge[T]
-	nodeComparator func(n1 Node[T], n2 Node[T]) int
-	nodeEqual      func(n1 Node[T], n2 Node[T]) bool
-	nodeHash       func(n Node[T]) string
-	directed       bool
+	edges    []Edge[T]
+	directed bool
+}
+
+type Node[T any] interface {
+	Compare(node Node[T]) int
+	Equal(node Node[T]) bool
+	Hash() int 
+	Val() T
 }
 
 // Represents an edge in Graph
@@ -20,45 +24,17 @@ type Edge[T any] struct {
 	weight float64
 }
 
-// Represents a node in Graph
-type Node[T any] struct {
-	val T
-}
-
-// Creates a generic empty graph with the given comparator and equivalence functions
-func CreateGraphFunc[T any](
-	comparator func(n1 Node[T], n2 Node[T]) int,
-	eqFn func(n1 Node[T], n2 Node[T]) bool,
-	hashFn func(n Node[T]) string,
-) Graph[T] {
+func CreateGraphFunc[T any]() Graph[T] {
 	return Graph[T]{
-		edges:          []Edge[T]{},
-		nodeComparator: comparator,
-		nodeEqual:      eqFn,
-		nodeHash:       hashFn,
+		edges: []Edge[T]{},
 	}
-}
-
-func (g Graph[T]) AddNodeComparator(comparator func(n1 Node[T], n2 Node[T]) int) Graph[T] {
-	return Graph[T]{edges: g.edges, nodeComparator: comparator, nodeEqual: g.nodeEqual, nodeHash: g.nodeHash}
-}
-
-func (g Graph[T]) AddNodeEqualFn(eqFn func(n1 Node[T], n2 Node[T]) bool) Graph[T] {
-	return Graph[T]{edges: g.edges, nodeComparator: g.nodeComparator, nodeEqual: eqFn, nodeHash: g.nodeHash}
-}
-
-func (g Graph[T]) AddNodeHash(hash func(n Node[T]) string) Graph[T] {
-	return Graph[T]{edges: g.edges, nodeComparator: g.nodeComparator, nodeEqual: g.nodeEqual, nodeHash: hash}
 }
 
 // Computes a new graph after adding that edge to this graph. Leaves the original graph unmodified.
 func (g Graph[T]) AddEdge(edge Edge[T]) Graph[T] {
 	newEdges := append(slices.Clone(g.edges), edge)
 	return Graph[T]{
-		edges:          newEdges,
-		nodeComparator: g.nodeComparator,
-		nodeEqual:      g.nodeEqual,
-		nodeHash:       g.nodeHash,
+		edges: newEdges,
 	}
 }
 
@@ -86,26 +62,13 @@ func (e Edge[T]) AddWeight(w float64) Edge[T] {
 	}
 }
 
-func CreateNode[T any](val T) Node[T] {
-	return Node[T]{
-		val: val,
-	}
-}
-
-func (n Node[T]) GetVal() T {
-	return n.val
-}
-
 /*
 Creates a new graph that interprets all edges as directed. I.e. makes all edges e <-> v to u -> v
 */
 func (g Graph[T]) ToDirected() Graph[T] {
 	return Graph[T]{
-		edges:          g.edges,
-		nodeComparator: g.nodeComparator,
-		nodeEqual:      g.nodeEqual,
-		nodeHash:       g.nodeHash,
-		directed:       true,
+		edges:    g.edges,
+		directed: true,
 	}
 }
 
@@ -126,9 +89,9 @@ func (e Edge[T]) Reverse() Edge[T] {
 func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 	returnEdges := []Edge[T]{}
 	for _, e := range g.edges {
-		if g.directed && g.nodeEqual(source, e.v) || (!g.directed && (g.nodeEqual(source, e.v))) {
+		if g.directed && source.Equal(e.v) || (!g.directed && source.Equal(e.v)) {
 			returnEdges = append(returnEdges, e)
-		} else if !g.directed && g.nodeEqual(source, e.u) {
+		} else if !g.directed && source.Equal(e.u) {
 			// We are going to reverse the direction of the edge
 			returnEdges = append(returnEdges, e.Reverse())
 		}
@@ -140,9 +103,9 @@ func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 func (g Graph[T]) FindEdgesThatLeadFrom(source Node[T]) []Edge[T] {
 	returnEdges := []Edge[T]{}
 	for _, e := range g.edges {
-		if (g.directed && g.nodeEqual(source, e.u)) || (!g.directed && g.nodeEqual(source, e.u)) {
+		if g.directed && source.Equal(e.u) || (!g.directed && source.Equal(e.u)) {
 			returnEdges = append(returnEdges, e)
-		} else if !g.directed && (g.nodeEqual(source, e.v)) {
+		} else if !g.directed && source.Equal(e.v) {
 			returnEdges = append(returnEdges, e.Reverse())
 		}
 	}
@@ -189,9 +152,11 @@ func (g Graph[T]) DFS(source Node[T]) []Node[T] {
 		// Mark the current node as visited
 		*visited = append(*visited, src)
 		neighbors := g.FindNeighboringNodes(src)
-		slices.SortStableFunc(neighbors, g.nodeComparator)
+		slices.SortStableFunc(neighbors, func(n1 Node[T], n2 Node[T]) int {
+			return n1.Compare(n2)
+		})
 		for _, neighbor := range neighbors {
-			if !slices.ContainsFunc(*visited, func(n Node[T]) bool { return g.nodeEqual(neighbor, n) }) {
+			if !slices.ContainsFunc(*visited, func(n Node[T]) bool { return neighbor.Equal(n) }) {
 				*acc = append(*acc, neighbor)
 				dfsImpl(neighbor, visited, acc)
 			}
@@ -217,10 +182,12 @@ func (g Graph[T]) BFS(source Node[T]) []Node[T] {
 		queue = queue[:len(queue)-1]
 		visited = append(visited, src)
 		neighbors := g.FindNeighboringNodes(src)
-		slices.SortStableFunc(neighbors, g.nodeComparator)
+		slices.SortStableFunc(neighbors, func(n1 Node[T], n2 Node[T]) int {
+			return n1.Compare(n2)
+		})
 		for _, neighbor := range neighbors {
 			// If we haven't visited this neighbor
-			if !slices.ContainsFunc(visited, func(n Node[T]) bool { return g.nodeEqual(neighbor, n) }) {
+			if !slices.ContainsFunc(visited, func(n Node[T]) bool { return neighbor.Equal(n) }) {
 				bfs = append(bfs, neighbor)
 				visited = append(visited, neighbor)
 				queue = append(queue, neighbor)
@@ -236,14 +203,16 @@ func (g Graph[T]) GetNodes() []Node[T] {
 	for _, edge := range g.edges {
 		n1 := edge.u
 		n2 := edge.v
-		if !slices.ContainsFunc(nodes, func(n Node[T]) bool { return g.nodeEqual(n1, n) }) {
+		if !slices.ContainsFunc(nodes, func(n Node[T]) bool { return n1.Equal(n) }) {
 			nodes = append(nodes, n1)
 		}
-		if !slices.ContainsFunc(nodes, func(n Node[T]) bool { return g.nodeEqual(n2, n) }) {
+		if !slices.ContainsFunc(nodes, func(n Node[T]) bool { return n2.Equal(n) }) {
 			nodes = append(nodes, n2)
 		}
 	}
-	slices.SortStableFunc(nodes, g.nodeComparator)
+	slices.SortStableFunc(nodes, func(n1 Node[T], n2 Node[T]) int {
+		return n1.Compare(n2)
+	})
 	return nodes
 }
 
@@ -253,9 +222,6 @@ func (g Graph[T]) GetNodes() []Node[T] {
 func MapGraph[T any, U any](
 	graph Graph[T],
 	mapFn func(Node[T]) Node[U],
-	comparator func(n1 Node[U], n2 Node[U]) int,
-	eqFn func(n1 Node[U], n2 Node[U]) bool,
-	hashFn func(n Node[U]) string,
 ) Graph[U] {
 	newEdges := []Edge[U]{}
 	for _, edge := range graph.edges {
@@ -269,10 +235,7 @@ func MapGraph[T any, U any](
 		newEdges = append(newEdges, newEdge)
 	}
 	return Graph[U]{
-		edges:          newEdges,
-		nodeComparator: comparator,
-		nodeEqual:      eqFn,
-		nodeHash:       hashFn,
+		edges: newEdges,
 	}
 }
 
@@ -285,10 +248,7 @@ func FilterGraph[T any](graph Graph[T], filterFn func(Edge[T]) bool) Graph[T] {
 		}
 	}
 	return Graph[T]{
-		edges:          newEdges,
-		nodeComparator: graph.nodeComparator,
-		nodeEqual:      graph.nodeEqual,
-		nodeHash:       graph.nodeHash,
+		edges: newEdges,
 	}
 }
 
@@ -355,11 +315,11 @@ func (g Graph[T]) ContainsCycle() bool {
 }
 
 // Returns a mapping of each nodes neighbors with the supplied hash function used as the key.
-func (g Graph[T]) ToAdjacencyMap() map[string][]Node[T] {
-	adjMap := map[string][]Node[T]{}
+func (g Graph[T]) ToAdjacencyMap() map[int][]Node[T] {
+	adjMap := map[int][]Node[T]{}
 	for _, n := range g.GetNodes() {
 		neighbors := g.FindNeighboringNodes(n)
-		adjMap[g.nodeHash(n)] = neighbors
+		adjMap[n.Hash()] = neighbors
 	}
 	return adjMap
 }
@@ -367,4 +327,9 @@ func (g Graph[T]) ToAdjacencyMap() map[string][]Node[T] {
 // Checks if this graph is a directed acyclic graph
 func (g Graph[T]) IsDAG() bool {
 	return g.IsDirectedGraph() && !g.ContainsCycle()
+}
+
+// Returns all possible topological sorts on this graph.
+func (g Graph[T]) GetAllTopologicalSorts() [][]Node[T] {
+	panic("Not Implemented")
 }

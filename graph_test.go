@@ -2,7 +2,7 @@ package graph_test
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
+	"encoding/binary"
 	"graph"
 	"strconv"
 	"strings"
@@ -11,42 +11,64 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var n0 = graph.CreateNode(0)
-var n1 = graph.CreateNode(1)
-var n2 = graph.CreateNode(2)
-var n3 = graph.CreateNode(3)
-var n4 = graph.CreateNode(4)
+type NumberNode struct {
+	val int
+}
 
-// Helper functions
-func comparator(n1, n2 graph.Node[int]) int {
-	return n1.GetVal() - n2.GetVal()
+func (n NumberNode) Compare(node graph.Node[int]) int {
+	return n.val - node.Val()
 }
-func nodeEq(n1, n2 graph.Node[int]) bool {
-	return n1.GetVal() == n2.GetVal()
+
+func (n NumberNode) Equal(node graph.Node[int]) bool {
+	return n.val == node.Val()
 }
-func intToStringNodeMap(n graph.Node[int]) graph.Node[string] {
-	val := n.GetVal()
-	strVal := strconv.Itoa(val)
-	return graph.CreateNode(strVal)
+
+func (n NumberNode) Hash() int {
+	return n.val
 }
-func strComparator(n1, n2 graph.Node[string]) int {
-	return strings.Compare(n1.GetVal(), n2.GetVal())
+
+func (n NumberNode) Val() int {
+	return n.val
 }
-func strNodeEq(n1, n2 graph.Node[string]) bool {
-	return n1.GetVal() == n2.GetVal()
+
+type StringNode struct {
+	val string
 }
-func hash(n graph.Node[int]) string {
-	return strconv.Itoa(n.GetVal())
+
+func (n StringNode) Compare(node graph.Node[string]) int {
+	return strings.Compare(n.val, node.Val())
 }
-func hashString(n graph.Node[string]) string {
+
+func (n StringNode) Equal(node graph.Node[string]) bool {
+	return n.val == node.Val()
+}
+
+func (n StringNode) Val() string {
+	return n.val
+}
+
+func (n StringNode) Hash() int {
 	hasher := sha256.New()
-	hasher.Write([]byte(n.GetVal()))
+	hasher.Write([]byte(n.val))
 	hashBytes := hasher.Sum(nil)
-	return hex.EncodeToString(hashBytes)
+	// Take first 8 bytes and convert to int
+	return int(binary.BigEndian.Uint64(hashBytes[:8]))
+}
+
+var n0 graph.Node[int] = NumberNode{0}
+var n1 graph.Node[int] = NumberNode{1}
+var n2 graph.Node[int] = NumberNode{2}
+var n3 graph.Node[int] = NumberNode{3}
+var n4 graph.Node[int] = NumberNode{4}
+
+func intToStringNodeMap(n graph.Node[int]) graph.Node[string] {
+	val := n.Val()
+	strVal := strconv.Itoa(val) // int → string
+	return StringNode{strVal}
 }
 
 func createGraph1() graph.Graph[int] {
-	g := graph.CreateGraphFunc(comparator, nodeEq, hash)
+	g := graph.CreateGraphFunc[int]()
 	g = g.AddEdge(graph.CreateEdge(n0, n1))
 	g = g.AddEdge(graph.CreateEdge(n0, n2))
 	g = g.AddEdge(graph.CreateEdge(n1, n2))
@@ -56,7 +78,7 @@ func createGraph1() graph.Graph[int] {
 }
 
 func createGraph2() graph.Graph[int] {
-	g := graph.CreateGraphFunc(comparator, nodeEq, hash)
+	g := graph.CreateGraphFunc[int]()
 	g = g.AddEdge(graph.CreateEdge(n0, n2))
 	g = g.AddEdge(graph.CreateEdge(n2, n1))
 	g = g.AddEdge(graph.CreateEdge(n0, n3))
@@ -64,11 +86,11 @@ func createGraph2() graph.Graph[int] {
 }
 
 func createDirectedCyclicGraph() graph.Graph[int] {
-	g := graph.CreateGraphFunc(comparator, nodeEq, hash)
-	n0 := graph.CreateNode(0)
-	n1 := graph.CreateNode(1)
-	n2 := graph.CreateNode(2)
-	n3 := graph.CreateNode(3)
+	g := graph.CreateGraphFunc[int]()
+	n0 := NumberNode{0}
+	n1 := NumberNode{1}
+	n2 := NumberNode{2}
+	n3 := NumberNode{3}
 	g = g.AddEdge(graph.CreateEdge(n0, n1))
 	g = g.AddEdge(graph.CreateEdge(n1, n2))
 	g = g.AddEdge(graph.CreateEdge(n2, n0))
@@ -77,12 +99,12 @@ func createDirectedCyclicGraph() graph.Graph[int] {
 }
 
 func TestCreateGraph(t *testing.T) {
-	g := graph.CreateGraphFunc(comparator, nodeEq, hash)
+	g := graph.CreateGraphFunc[int]()
 	assert.NotNil(t, g)
 }
 
 func TestAddEdge(t *testing.T) {
-	g := graph.CreateGraphFunc(comparator, nodeEq, hash)
+	g := graph.CreateGraphFunc[int]()
 	g = g.AddEdge(graph.CreateEdge(n1, n2))
 	assert.Equal(t, 1, g.GetNumberOfEdges())
 	g = g.AddEdge(graph.CreateEdge(n2, n3))
@@ -145,17 +167,17 @@ func TestGetNodes(t *testing.T) {
 
 func TestMapGraph1(t *testing.T) {
 	g := createGraph1()
-	newG := graph.MapGraph(g, intToStringNodeMap, strComparator, strNodeEq, hashString)
+	newG := graph.MapGraph(g, intToStringNodeMap)
 	n0 := newG.GetNodes()[0]
 	n1 := newG.GetNodes()[1]
 	n2 := newG.GetNodes()[2]
 	n3 := newG.GetNodes()[3]
 	n4 := newG.GetNodes()[4]
-	assert.Equal(t, "0", n0.GetVal())
-	assert.Equal(t, "1", n1.GetVal())
-	assert.Equal(t, "2", n2.GetVal())
-	assert.Equal(t, "3", n3.GetVal())
-	assert.Equal(t, "4", n4.GetVal())
+	assert.Equal(t, "0", n0.Val())
+	assert.Equal(t, "1", n1.Val())
+	assert.Equal(t, "2", n2.Val())
+	assert.Equal(t, "3", n3.Val())
+	assert.Equal(t, "4", n4.Val())
 }
 
 func TestCyclicGraph1(t *testing.T) {

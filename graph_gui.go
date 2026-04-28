@@ -204,11 +204,11 @@ func renderAnyToText[T any](gtx layout.Context, theme *material.Theme, any T) la
 }
 
 // Renders this node as a circle with its value as its label.
-func (n Node[T]) renderNodeWidget(widgets *widgets) layout.Widget {
+func renderNodeWidget[T any](n Node[T], widgets *widgets) layout.Widget {
 	size := nodeCircleSize.Mul(2)
 	return func(gtx layout.Context) layout.Dimensions {
 		labelWidget := func(gtx layout.Context) layout.Dimensions {
-			label := renderAnyToText(gtx, widgets.mainTheme, n.GetVal())
+			label := renderAnyToText(gtx, widgets.mainTheme, n.Val())
 			return label
 		}
 		circleWidget := func(gtx layout.Context) layout.Dimensions {
@@ -224,8 +224,8 @@ func (n Node[T]) renderNodeWidget(widgets *widgets) layout.Widget {
 }
 
 func (e Edge[T]) renderEdge(gtx layout.Context, widgets *widgets) layout.Dimensions {
-	u := e.U().renderNodeWidget(widgets)
-	v := e.V().renderNodeWidget(widgets)
+	u := renderNodeWidget(e.U(), widgets)
+	v := renderNodeWidget(e.V(), widgets)
 	// Now draw a single line between them horizonally
 	var edgeWidget layout.Widget = func(gtx layout.Context) layout.Dimensions {
 		lineSize := edgeSize
