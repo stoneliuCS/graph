@@ -13,7 +13,7 @@ type Graph[T any] struct {
 type Node[T any] interface {
 	Compare(node Node[T]) int
 	Equal(node Node[T]) bool
-	Hash() int 
+	Hash() int
 	Val() T
 }
 
@@ -329,7 +329,49 @@ func (g Graph[T]) IsDAG() bool {
 	return g.IsDirectedGraph() && !g.ContainsCycle()
 }
 
-// Returns all possible topological sorts on this graph.
+// Returns all possible topological sorts on this graph. This implementation relies on a hash function that does not
+// have any collision detection
 func (g Graph[T]) GetAllTopologicalSorts() [][]Node[T] {
-	panic("Not Implemented")
+	if !g.IsDAG() {
+		panic("The following graph must be a DAG")
+	}
+	var backtrack func(visited map[int]bool, indeg map[int]int, adjMap map[int][]Node[T], ordering *[]Node[T], allOrderings *[][]Node[T])
+	backtrack = func(visited map[int]bool, indeg map[int]int, adjMap map[int][]Node[T], ordering *[]Node[T], allOrderings *[][]Node[T]) {
+		for _, node := range g.GetNodes() {
+			hash := node.Hash()
+			if indeg[hash] != 0 && !visited[hash] {
+				return
+			}
+			neighbors := adjMap[hash]
+			// Reduce the indegree on each neighbor
+			for _, neighbor := range neighbors {
+				indeg[neighbor.Hash()] = indeg[neighbor.Hash()] - 1
+			}
+			*ordering = append(*ordering, node)
+			visited[hash] = true
+			backtrack(visited, indeg, adjMap, ordering, allOrderings)
+			for _, neighbor := range neighbors {
+				indeg[neighbor.Hash()] = indeg[neighbor.Hash()] + 1
+			}
+			*ordering = (*ordering)[:len(*ordering)-1] // pop
+			visited[hash] = false
+		}
+		if len(*ordering) == len(g.GetNodes()) {
+			*allOrderings = append(*allOrderings, *ordering)
+		}
+	}
+	adjMap := g.ToAdjacencyMap()
+	visitedSet := map[int]bool{}
+	indegrees := map[int]int{}
+	outdegrees := map[int]int{}
+	topologicalOrdering := []Node[T]{}
+	allTopologicalOrderings := [][]Node[T]{}
+	nodes := g.GetNodes()
+	for _, n := range nodes {
+		visitedSet[n.Hash()] = false
+		indegrees[n.Hash()] = g.FindInDegree(n)
+		outdegrees[n.Hash()] = g.FindOutDegree(n)
+	}
+	backtrack(visitedSet, indegrees, adjMap, &topologicalOrdering, &allTopologicalOrderings)
+	return allTopologicalOrderings
 }
