@@ -375,3 +375,28 @@ func (g Graph[T]) GetAllTopologicalSorts() [][]Node[T] {
 	backtrack(visitedSet, indegrees, adjMap, &topologicalOrdering, &allTopologicalOrderings)
 	return allTopologicalOrderings
 }
+
+func (g Graph[T]) hasNegativeEdgeWeights() bool {
+	for _, edge := range g.edges {
+		if edge.weight < 0 {
+			return true
+		}
+	}
+	return false
+}
+
+type nodeMinHeap[T Node[T]] struct {
+	heap []T
+}
+
+func (n nodeMinHeap[T]) Len() int {
+	return len(n.heap)
+}
+
+func (n nodeMinHeap[T]) Less(i int, j int) bool {
+	return n.heap[i].Compare(n.heap[j]) < 0
+}
+
+func (n nodeMinHeap[T]) Swap(i int, j int) {
+	n.heap[i], n.heap[j] = n.heap[j], n.heap[i]
+}
