@@ -25,6 +25,7 @@ these include
 - `Map` _MapGraph_, enables mapping/translating a graph of type `X` to a graph of type `Y`.
 - `Filter` _FilterGraph_, enables filtering of edges on this graph by a specific predicate.
 - `Cycle Detection` _ContainsCycle_ determines if a graph contains a cycle.
+- `Dijkstras` _Dijkstras_ for finding *a* single shortest path to each node from a provided root.
 
 ## API Design
 Every single method and function available in `graph` is pure and functional. Meaning that the resulting method

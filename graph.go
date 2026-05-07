@@ -1,6 +1,8 @@
 package graph
 
 import (
+	"container/heap"
+	"math"
 	"slices"
 )
 
@@ -385,18 +387,83 @@ func (g Graph[T]) hasNegativeEdgeWeights() bool {
 	return false
 }
 
-type nodeMinHeap[T Node[T]] struct {
-	heap []T
+type nodeMinHeap[T any] struct {
+	heap []Node[T]
 }
 
-func (n nodeMinHeap[T]) Len() int {
-	return len(n.heap)
+func (n *nodeMinHeap[T]) Len() int           { return len(n.heap) }
+func (n *nodeMinHeap[T]) Less(i, j int) bool { return n.heap[i].Compare(n.heap[j]) < 0 }
+func (n *nodeMinHeap[T]) Swap(i, j int)      { n.heap[i], n.heap[j] = n.heap[j], n.heap[i] }
+
+func (n *nodeMinHeap[T]) Push(x any) {
+	n.heap = append(n.heap, x.(Node[T]))
 }
 
-func (n nodeMinHeap[T]) Less(i int, j int) bool {
-	return n.heap[i].Compare(n.heap[j]) < 0
+func (n *nodeMinHeap[T]) Pop() any {
+	last := n.heap[len(n.heap)-1]
+	n.heap = n.heap[:len(n.heap)-1]
+	return last
 }
 
-func (n nodeMinHeap[T]) Swap(i int, j int) {
-	n.heap[i], n.heap[j] = n.heap[j], n.heap[i]
+func (g Graph[T]) ToWeightedAdjacencyMap() map[int][]Edge[T] {
+	adj := map[int][]Edge[T]{}
+	for _, n := range g.GetNodes() {
+		adj[n.Hash()] = g.FindEdgesThatLeadFrom(n)
+	}
+	return adj
+}
+
+func (g Graph[T]) Dijkstras(root Node[T]) map[int][]Node[T] {
+	if g.hasNegativeEdgeWeights() {
+		panic("Cannot run Dijkstras with negative edge weights")
+	}
+	allShortestPaths := map[int][]Node[T]{}
+	predecessors := map[int]*Node[T]{}
+	dist := map[int]float64{}
+	minHeap := &nodeMinHeap[T]{heap: []Node[T]{root}}
+	visited := map[int]bool{}
+	adj_map := g.ToWeightedAdjacencyMap()
+	heap.Init(minHeap)
+	// Initialize all distance mappings to infinity
+	for _, node := range g.GetNodes() {
+		dist[node.Hash()] = math.Inf(1)
+		predecessors[node.Hash()] = nil
+		visited[node.Hash()] = false
+	}
+	dist[root.Hash()] = 0
+
+	for minHeap.Len() > 0 {
+		curr := heap.Pop(minHeap).(Node[T])
+		if visited[curr.Hash()] {
+			continue
+		}
+		visited[curr.Hash()] = true
+		neighbors := adj_map[curr.Hash()]
+
+		for _, neighborEdge := range neighbors {
+			neighbor := neighborEdge.v
+			weight := neighborEdge.weight
+			newWeight := weight + dist[curr.Hash()]
+			if newWeight < dist[neighbor.Hash()] {
+				dist[neighbor.Hash()] = newWeight
+				predecessors[neighbor.Hash()] = &curr
+				heap.Push(minHeap, neighbor)
+			}
+		}
+	}
+
+	// Now we build all shortest paths to each node.
+	for _, node := range g.GetNodes() {
+		if math.IsInf(dist[node.Hash()], 1) {
+			continue
+		}
+		path := []Node[T]{}
+		for curr := node; !curr.Equal(root); curr = *predecessors[curr.Hash()] {
+			path = append(path, curr)
+		}
+		path = append(path, root)
+		slices.Reverse(path)
+		allShortestPaths[node.Hash()] = path
+	}
+	return allShortestPaths
 }
