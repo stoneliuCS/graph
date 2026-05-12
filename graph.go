@@ -9,6 +9,7 @@ import (
 // Represents a graph of any structure or type.
 type Graph[T any] struct {
 	edges    []Edge[T]
+	nodes    []Node[T]
 	directed bool
 }
 
@@ -26,41 +27,39 @@ type Edge[T any] struct {
 	weight float64
 }
 
-func CreateGraphFunc[T any]() Graph[T] {
+func CreateUndirected[T any]() Graph[T] {
 	return Graph[T]{
-		edges: []Edge[T]{},
+		nodes:    []Node[T]{},
+		edges:    []Edge[T]{},
+		directed: false,
+	}
+}
+
+func CreateDirected[T any]() Graph[T] {
+	return Graph[T]{
+		nodes:    []Node[T]{},
+		edges:    []Edge[T]{},
+		directed: true,
 	}
 }
 
 // Computes a new graph after adding that edge to this graph. Leaves the original graph unmodified.
-func (g Graph[T]) AddEdge(edge Edge[T]) Graph[T] {
+func (g Graph[T]) AddEdge(u Node[T], v Node[T], weight float64) Graph[T] {
+	edge := Edge[T]{u, v, weight}
 	newEdges := append(slices.Clone(g.edges), edge)
+	newNodes := slices.Clone(g.nodes)
+
+	if !slices.Contains(newNodes, u) {
+		newNodes = append(newNodes, u)
+	}
+	if !slices.Contains(newNodes, v) {
+		newNodes = append(newNodes, v)
+	}
+
 	return Graph[T]{
-		edges: newEdges,
-	}
-}
-
-// Creates an undirected, unweighted edge from u to v.
-func CreateEdge[T any](u Node[T], v Node[T]) Edge[T] {
-	return Edge[T]{
-		u: u,
-		v: v,
-	}
-}
-
-func (e Edge[T]) U() Node[T] {
-	return e.u
-}
-
-func (e Edge[T]) V() Node[T] {
-	return e.v
-}
-
-func (e Edge[T]) AddWeight(w float64) Edge[T] {
-	return Edge[T]{
-		u:      e.u,
-		v:      e.v,
-		weight: w,
+		edges:    newEdges,
+		nodes:    newNodes,
+		directed: g.directed,
 	}
 }
 
@@ -70,6 +69,7 @@ Creates a new graph that interprets all edges as directed. I.e. makes all edges 
 func (g Graph[T]) ToDirected() Graph[T] {
 	return Graph[T]{
 		edges:    g.edges,
+		nodes:    g.nodes,
 		directed: true,
 	}
 }
@@ -79,12 +79,20 @@ func (g Graph[T]) GetNumberOfEdges() int {
 }
 
 // Reverses this edge, has no effect on an undirected edge
-func (e Edge[T]) Reverse() Edge[T] {
+func (e Edge[T]) reverse() Edge[T] {
 	return Edge[T]{
 		u:      e.v,
 		v:      e.u,
 		weight: e.weight,
 	}
+}
+
+func (e Edge[T]) V() Node[T] {
+	return e.v
+}
+
+func (e Edge[T]) U() Node[T] {
+	return e.u
 }
 
 // Finds the edges that lead to the given node. Checks using the given equality function on the graph
@@ -95,7 +103,7 @@ func (g Graph[T]) FindEdgesThatLeadTo(source Node[T]) []Edge[T] {
 			returnEdges = append(returnEdges, e)
 		} else if !g.directed && source.Equal(e.u) {
 			// We are going to reverse the direction of the edge
-			returnEdges = append(returnEdges, e.Reverse())
+			returnEdges = append(returnEdges, e.reverse())
 		}
 	}
 	return returnEdges
@@ -108,7 +116,7 @@ func (g Graph[T]) FindEdgesThatLeadFrom(source Node[T]) []Edge[T] {
 		if g.directed && source.Equal(e.u) || (!g.directed && source.Equal(e.u)) {
 			returnEdges = append(returnEdges, e)
 		} else if !g.directed && source.Equal(e.v) {
-			returnEdges = append(returnEdges, e.Reverse())
+			returnEdges = append(returnEdges, e.reverse())
 		}
 	}
 	return returnEdges
@@ -131,7 +139,7 @@ func (g Graph[T]) FindNeighboringNodes(source Node[T]) []Node[T] {
 		}
 	}
 	// Another check, every to edge is also a neighbor
-	if g.IsDirectedGraph() {
+	if !g.IsDirectedGraph() {
 		for _, edge := range edgesThatLeadTo {
 			neighbor := edge.u
 			if !slices.Contains(neighbors, &neighbor) {
@@ -199,45 +207,39 @@ func (g Graph[T]) BFS(source Node[T]) []Node[T] {
 	return bfs
 }
 
-// Gets all the nodes in this graph. The nodes are returned as specified in the given node comparator.
 func (g Graph[T]) GetNodes() []Node[T] {
-	nodes := []Node[T]{}
-	for _, edge := range g.edges {
-		n1 := edge.u
-		n2 := edge.v
-		if !slices.ContainsFunc(nodes, func(n Node[T]) bool { return n1.Equal(n) }) {
-			nodes = append(nodes, n1)
-		}
-		if !slices.ContainsFunc(nodes, func(n Node[T]) bool { return n2.Equal(n) }) {
-			nodes = append(nodes, n2)
-		}
-	}
-	slices.SortStableFunc(nodes, func(n1 Node[T], n2 Node[T]) int {
-		return n1.Compare(n2)
-	})
-	return nodes
+	return g.nodes
+}
+
+func (g Graph[T]) GetNumberOfNodes() int {
+	return len(g.nodes)
 }
 
 // Returns a new graph with all nodes of type U instead of type T. To make the resulting graph valid, one must also pass
 // in the corresponding comparator and equivalence functions on that type U
 // Maintains the order of the edges from the previous graph.
 func MapGraph[T any, U any](
-	graph Graph[T],
+	g Graph[T],
 	mapFn func(Node[T]) Node[U],
 ) Graph[U] {
 	newEdges := []Edge[U]{}
-	for _, edge := range graph.edges {
-		newU := mapFn(edge.u)
-		newV := mapFn(edge.v)
+	newNodes := []Node[U]{}
+	for _, e := range g.edges {
+		newU := mapFn(e.u)
+		newV := mapFn(e.v)
 		newEdge := Edge[U]{
 			u:      newU,
 			v:      newV,
-			weight: edge.weight,
+			weight: e.weight,
 		}
 		newEdges = append(newEdges, newEdge)
+		newNodes = append(newNodes, newU)
+		newNodes = append(newNodes, newV)
 	}
 	return Graph[U]{
-		edges: newEdges,
+		edges:    newEdges,
+		nodes:    newNodes,
+		directed: g.directed,
 	}
 }
 
@@ -287,6 +289,9 @@ func (g Graph[T]) GetLeafNodes() []Node[T] {
 
 // Determines if this graph contains a cycle.
 func (g Graph[T]) ContainsCycle() bool {
+	if !g.directed {
+		panic("Cannot check if an undirected graph has a cycle")
+	}
 	var isCyclicImpl func(idx int, node Node[T], visited, stack []bool) bool
 	isCyclicImpl = func(idx int, node Node[T], visited, stack []bool) bool {
 		if stack[idx] {
