@@ -71,6 +71,11 @@ func abc() graph.Graph[string] {
 	return g
 }
 
+func abcNoEdges() graph.Graph[string] {
+	g := graph.CreateDirected[string]()
+	return g.AddNode(StringNode{"A"}).AddNode(StringNode{"B"}).AddNode(StringNode{"C"})
+}
+
 // UNIT TESTING
 
 func TestABCGraph(t *testing.T) {
@@ -99,5 +104,43 @@ func TestABCGraph(t *testing.T) {
 		dfs := abc.DFS(starting_node)
 		bfs := abc.BFS(starting_node)
 		assert.Equal(t, dfs, bfs)
+	}
+
+	// This graph has a cycle so no possible way to topologically sort this graph.
+	assert.Panics(t, func() { abc.GetAllTopologicalSorts() })
+}
+
+func TestABCGraphNoEdges(t *testing.T) {
+	abc := abcNoEdges()
+	topSorts := abc.GetAllTopologicalSorts()
+	// There are 3! number of topological sorts since this has no edges.
+	assert.Equal(t, 6, len(topSorts))
+	// All possible permutations since there are no edges.
+	assert.Contains(t, topSorts, []graph.Node[string]{StringNode{"A"}, StringNode{"B"}, StringNode{"C"}})
+	assert.Contains(t, topSorts, []graph.Node[string]{StringNode{"A"}, StringNode{"C"}, StringNode{"B"}})
+	assert.Contains(t, topSorts, []graph.Node[string]{StringNode{"B"}, StringNode{"C"}, StringNode{"A"}})
+	assert.Contains(t, topSorts, []graph.Node[string]{StringNode{"C"}, StringNode{"B"}, StringNode{"A"}})
+	assert.Contains(t, topSorts, []graph.Node[string]{StringNode{"B"}, StringNode{"A"}, StringNode{"C"}})
+	assert.Contains(t, topSorts, []graph.Node[string]{StringNode{"C"}, StringNode{"A"}, StringNode{"B"}})
+}
+
+func TestAdjacencyMaps(t *testing.T) {
+	noEdgeAbc := abcNoEdges()
+	edgeABC := abc()
+
+	noEdgeAdjEdgeMap := noEdgeAbc.ToAdjacencyEdgeMap()
+	noEdgeAdjNodeMap := noEdgeAbc.ToAdjacencyNodeMap()
+
+	adjEdgeMap := edgeABC.ToAdjacencyEdgeMap()
+	adjNodeMap := edgeABC.ToAdjacencyNodeMap()
+	// There should be an entry for each node in the graph
+	assert.Equal(t, 3, len(noEdgeAdjEdgeMap))
+	assert.Equal(t, 3, len(noEdgeAdjNodeMap))
+	assert.Equal(t, 3, len(adjEdgeMap))
+	assert.Equal(t, 3, len(adjNodeMap))
+
+	for _, node := range noEdgeAbc.GetNodes() {
+		assert.Empty(t, noEdgeAdjEdgeMap[node.Hash()])
+		assert.Empty(t, noEdgeAdjNodeMap[node.Hash()])
 	}
 }

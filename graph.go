@@ -63,6 +63,15 @@ func (g Graph[T]) AddEdge(u Node[T], v Node[T], weight float64) Graph[T] {
 	}
 }
 
+func (g Graph[T]) AddNode(node Node[T]) Graph[T] {
+	newNodes := append(slices.Clone(g.nodes), node)
+	return Graph[T]{
+		edges:    g.edges,
+		nodes:    newNodes,
+		directed: g.directed,
+	}
+}
+
 /*
 Creates a new graph that interprets all edges as directed. I.e. makes all edges e <-> v to u -> v
 */
@@ -208,7 +217,7 @@ func (g Graph[T]) BFS(source Node[T]) []Node[T] {
 }
 
 func (g Graph[T]) GetNodes() []Node[T] {
-	return g.nodes
+	return slices.Clone(g.nodes)
 }
 
 func (g Graph[T]) GetNumberOfNodes() int {
@@ -322,7 +331,7 @@ func (g Graph[T]) ContainsCycle() bool {
 }
 
 // Returns a mapping of each nodes neighbors with the supplied hash function used as the key.
-func (g Graph[T]) ToAdjacencyMap() map[int][]Node[T] {
+func (g Graph[T]) ToAdjacencyNodeMap() map[int][]Node[T] {
 	adjMap := map[int][]Node[T]{}
 	for _, n := range g.GetNodes() {
 		neighbors := g.FindNeighboringNodes(n)
@@ -346,8 +355,8 @@ func (g Graph[T]) GetAllTopologicalSorts() [][]Node[T] {
 	backtrack = func(visited map[int]bool, indeg map[int]int, adjMap map[int][]Node[T], ordering *[]Node[T], allOrderings *[][]Node[T]) {
 		for _, node := range g.GetNodes() {
 			hash := node.Hash()
-			if indeg[hash] != 0 && !visited[hash] {
-				return
+			if indeg[hash] != 0 || visited[hash] {
+				continue
 			}
 			neighbors := adjMap[hash]
 			// Reduce the indegree on each neighbor
@@ -364,20 +373,18 @@ func (g Graph[T]) GetAllTopologicalSorts() [][]Node[T] {
 			visited[hash] = false
 		}
 		if len(*ordering) == len(g.GetNodes()) {
-			*allOrderings = append(*allOrderings, *ordering)
+			*allOrderings = append(*allOrderings, slices.Clone(*ordering))
 		}
 	}
-	adjMap := g.ToAdjacencyMap()
+	adjMap := g.ToAdjacencyNodeMap()
 	visitedSet := map[int]bool{}
 	indegrees := map[int]int{}
-	outdegrees := map[int]int{}
 	topologicalOrdering := []Node[T]{}
 	allTopologicalOrderings := [][]Node[T]{}
 	nodes := g.GetNodes()
 	for _, n := range nodes {
 		visitedSet[n.Hash()] = false
 		indegrees[n.Hash()] = g.FindInDegree(n)
-		outdegrees[n.Hash()] = g.FindOutDegree(n)
 	}
 	backtrack(visitedSet, indegrees, adjMap, &topologicalOrdering, &allTopologicalOrderings)
 	return allTopologicalOrderings
@@ -410,7 +417,7 @@ func (n *nodeMinHeap[T]) Pop() any {
 	return last
 }
 
-func (g Graph[T]) ToWeightedAdjacencyMap() map[int][]Edge[T] {
+func (g Graph[T]) ToAdjacencyEdgeMap() map[int][]Edge[T] {
 	adj := map[int][]Edge[T]{}
 	for _, n := range g.GetNodes() {
 		adj[n.Hash()] = g.FindEdgesThatLeadFrom(n)
@@ -427,7 +434,7 @@ func (g Graph[T]) Dijkstras(root Node[T]) map[int][]Node[T] {
 	dist := map[int]float64{}
 	minHeap := &nodeMinHeap[T]{heap: []Node[T]{root}}
 	visited := map[int]bool{}
-	adj_map := g.ToWeightedAdjacencyMap()
+	adj_map := g.ToAdjacencyEdgeMap()
 	heap.Init(minHeap)
 	// Initialize all distance mappings to infinity
 	for _, node := range g.GetNodes() {
